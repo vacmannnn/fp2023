@@ -1,0 +1,115 @@
+# dune runtest -w
+# OCAMLPARAM: unset
+# Shared cache: disabled
+# Workspace root: /home/vacman/lua
+# Auto-detected concurrency: 12
+$ /home/vacman/.opam/homework/bin/ocamlc.opt -config > /tmp/dune_7fca2d_output
+# Dune context:
+#  { name = "default"
+#  ; kind = "default"
+#  ; profile = Dev
+#  ; merlin = true
+#  ; for_host = None
+#  ; fdo_target_exe = None
+#  ; build_dir = In_build_dir "default"
+#  ; ocaml_bin = External "/home/vacman/.opam/homework/bin"
+#  ; ocaml = Ok External "/home/vacman/.opam/homework/bin/ocaml"
+#  ; ocamlc = External "/home/vacman/.opam/homework/bin/ocamlc.opt"
+#  ; ocamlopt = Ok External "/home/vacman/.opam/homework/bin/ocamlopt.opt"
+#  ; ocamldep = Ok External "/home/vacman/.opam/homework/bin/ocamldep.opt"
+#  ; ocamlmklib = Ok External "/home/vacman/.opam/homework/bin/ocamlmklib.opt"
+#  ; installed_env =
+#      map
+#        { "INSIDE_DUNE" : "/home/vacman/lua/_build/default"
+#        ; "OCAML_COLOR" : "always"
+#        ; "OPAMCOLOR" : "always"
+#        }
+#  ; findlib_paths = [ External "/home/vacman/.opam/homework/lib" ]
+#  ; ocaml_config =
+#      { version = "4.14.1"
+#      ; standard_library_default = "/home/vacman/.opam/homework/lib/ocaml"
+#      ; standard_library = "/home/vacman/.opam/homework/lib/ocaml"
+#      ; standard_runtime = "the_standard_runtime_variable_was_deleted"
+#      ; ccomp_type = "cc"
+#      ; c_compiler = "gcc"
+#      ; ocamlc_cflags =
+#          [ "-O2"; "-fno-strict-aliasing"; "-fwrapv"; "-pthread"; "-fPIC" ]
+#      ; ocamlc_cppflags = [ "-D_FILE_OFFSET_BITS=64" ]
+#      ; ocamlopt_cflags =
+#          [ "-O2"; "-fno-strict-aliasing"; "-fwrapv"; "-pthread"; "-fPIC" ]
+#      ; ocamlopt_cppflags = [ "-D_FILE_OFFSET_BITS=64" ]
+#      ; bytecomp_c_compiler =
+#          [ "gcc"
+#          ; "-O2"
+#          ; "-fno-strict-aliasing"
+#          ; "-fwrapv"
+#          ; "-pthread"
+#          ; "-fPIC"
+#          ; "-D_FILE_OFFSET_BITS=64"
+#          ]
+#      ; bytecomp_c_libraries = [ "-lm"; "-lpthread" ]
+#      ; native_c_compiler =
+#          [ "gcc"
+#          ; "-O2"
+#          ; "-fno-strict-aliasing"
+#          ; "-fwrapv"
+#          ; "-pthread"
+#          ; "-fPIC"
+#          ; "-D_FILE_OFFSET_BITS=64"
+#          ]
+#      ; native_c_libraries = [ "-lm" ]
+#      ; native_pack_linker = [ "ld"; "-r"; "-o" ]
+#      ; cc_profile = []
+#      ; architecture = "amd64"
+#      ; model = "default"
+#      ; int_size = 63
+#      ; word_size = 64
+#      ; system = "linux"
+#      ; asm = [ "as" ]
+#      ; asm_cfi_supported = true
+#      ; with_frame_pointers = false
+#      ; ext_exe = ""
+#      ; ext_obj = ".o"
+#      ; ext_asm = ".s"
+#      ; ext_lib = ".a"
+#      ; ext_dll = ".so"
+#      ; os_type = "Unix"
+#      ; default_executable_name = "a.out"
+#      ; systhread_supported = true
+#      ; host = "x86_64-pc-linux-gnu"
+#      ; target = "x86_64-pc-linux-gnu"
+#      ; profiling = false
+#      ; flambda = true
+#      ; spacetime = false
+#      ; safe_string = true
+#      ; exec_magic_number = "Caml1999X031"
+#      ; cmi_magic_number = "Caml1999I031"
+#      ; cmo_magic_number = "Caml1999O031"
+#      ; cma_magic_number = "Caml1999A031"
+#      ; cmx_magic_number = "Caml1999y031"
+#      ; cmxa_magic_number = "Caml1999z031"
+#      ; ast_impl_magic_number = "Caml1999M031"
+#      ; ast_intf_magic_number = "Caml1999N031"
+#      ; cmxs_magic_number = "Caml1999D031"
+#      ; cmt_magic_number = "Caml1999T031"
+#      ; natdynlink_supported = true
+#      ; supports_shared_libraries = true
+#      ; windows_unicode = false
+#      }
+#  ; instrument_with = []
+#  }
+# Attempted to add watch to non-existent directory /mnt/c/Program
+# Files/Docker/Docker/resources.
+# Promoting "_build/default/Lua.opam" to "Lua.opam"
+# Attempted to add watch to non-existent directory /mnt/c/Program
+# Files/JetBrains/PyCharm 2023.1.2.
+# Attempted to add watch to non-existent directory /mnt/c/Program
+# Files/Docker/Docker/resources.
+# Attempted to add watch to non-existent directory /mnt/c/Program
+# Files/JetBrains/PyCharm 2023.1.2.
+$ (cd _build/.sandbox/8f1cb884729f64c2e7412f2f11b62197/default && .ppx/a2214fde0f9080164c234835e457c45a/ppx.exe --cookie 'library-name="parser"' -o lib/parser/stat.pp.ml --impl lib/parser/stat.ml -corrected-suffix .ppx-corrected -diff-cmd - -dump-ast)
+$ (cd _build/default && /home/vacman/.opam/homework/bin/ocamldep.opt -modules -impl lib/parser/stat.pp.ml) > _build/default/lib/parser/.parser.objs/parser__Stat.impl.d
+$ (cd _build/default && /home/vacman/.opam/homework/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62@67@69-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -w -3-9-32-34-58 -g -I lib/parser/.parser.objs/byte -I lib/parser/.parser.objs/native -I /home/vacman/.opam/homework/lib/angstrom -I /home/vacman/.opam/homework/lib/base -I /home/vacman/.opam/homework/lib/base/base_internalhash_types -I /home/vacman/.opam/homework/lib/base/caml -I /home/vacman/.opam/homework/lib/base/shadow_stdlib -I /home/vacman/.opam/homework/lib/bigstringaf -I /home/vacman/.opam/homework/lib/jane-street-headers -I /home/vacman/.opam/homework/lib/ppx_compare/runtime-lib -I /home/vacman/.opam/homework/lib/ppx_deriving/runtime -I /home/vacman/.opam/homework/lib/ppx_enumerate/runtime-lib -I /home/vacman/.opam/homework/lib/ppx_expect/collector -I /home/vacman/.opam/homework/lib/ppx_expect/common -I /home/vacman/.opam/homework/lib/ppx_expect/config -I /home/vacman/.opam/homework/lib/ppx_expect/config_types -I /home/vacman/.opam/homework/lib/ppx_hash/runtime-lib -I /home/vacman/.opam/homework/lib/ppx_here/runtime-lib -I /home/vacman/.opam/homework/lib/ppx_inline_test/config -I /home/vacman/.opam/homework/lib/ppx_inline_test/runtime-lib -I /home/vacman/.opam/homework/lib/ppx_sexp_conv/runtime-lib -I /home/vacman/.opam/homework/lib/result -I /home/vacman/.opam/homework/lib/sexplib0 -I /home/vacman/.opam/homework/lib/time_now -I lib/ast/.ast.objs/byte -I lib/ast/.ast.objs/native -intf-suffix .ml -no-alias-deps -opaque -open Parser__ -o lib/parser/.parser.objs/native/parser__Stat.cmx -c -impl lib/parser/stat.pp.ml)
+$ (cd _build/default && /home/vacman/.opam/homework/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62@67@69-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -w -3-9-32-34-58 -g -a -o lib/parser/parser.cmxa lib/parser/.parser.objs/native/parser__.cmx lib/parser/.parser.objs/native/parser__Common.cmx lib/parser/.parser.objs/native/parser__Expr.cmx lib/parser/.parser.objs/native/parser__Stat.cmx lib/parser/.parser.objs/native/parser.cmx)
+$ (cd _build/default && /home/vacman/.opam/homework/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62@67@69-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -w -3-9-32-34-58 -w -24 -g -g -o lib/parser/.parser.inline-tests/inline_test_runner_parser.exe /home/vacman/.opam/homework/lib/base/base_internalhash_types/base_internalhash_types.cmxa -I /home/vacman/.opam/homework/lib/base/base_internalhash_types /home/vacman/.opam/homework/lib/base/caml/caml.cmxa /home/vacman/.opam/homework/lib/sexplib0/sexplib0.cmxa /home/vacman/.opam/homework/lib/base/shadow_stdlib/shadow_stdlib.cmxa /home/vacman/.opam/homework/lib/base/base.cmxa -I /home/vacman/.opam/homework/lib/base /home/vacman/.opam/homework/lib/bigstringaf/bigstringaf.cmxa -I /home/vacman/.opam/homework/lib/bigstringaf /home/vacman/.opam/homework/lib/angstrom/angstrom.cmxa /home/vacman/.opam/homework/lib/result/result.cmxa /home/vacman/.opam/homework/lib/ppx_deriving/runtime/ppx_deriving_runtime.cmxa lib/ast/ast.cmxa /home/vacman/.opam/homework/lib/ppx_inline_test/config/inline_test_config.cmxa /home/vacman/.opam/homework/lib/jane-street-headers/jane_street_headers.cmxa /home/vacman/.opam/homework/lib/ppx_sexp_conv/runtime-lib/ppx_sexp_conv_lib.cmxa /home/vacman/.opam/homework/lib/ppx_compare/runtime-lib/ppx_compare_lib.cmxa /home/vacman/.opam/homework/lib/ppx_enumerate/runtime-lib/ppx_enumerate_lib.cmxa /home/vacman/.opam/homework/lib/ppx_hash/runtime-lib/ppx_hash_lib.cmxa /home/vacman/.opam/homework/lib/time_now/time_now.cmxa -I /home/vacman/.opam/homework/lib/time_now /home/vacman/.opam/homework/lib/ppx_inline_test/runtime-lib/ppx_inline_test_lib.cmxa /home/vacman/.opam/homework/lib/ppx_here/runtime-lib/ppx_here_lib.cmxa /home/vacman/.opam/homework/lib/ppx_expect/common/expect_test_common.cmxa /home/vacman/.opam/homework/lib/ppx_expect/config_types/expect_test_config_types.cmxa /home/vacman/.opam/homework/lib/ppx_expect/collector/expect_test_collector.cmxa -I /home/vacman/.opam/homework/lib/ppx_expect/collector /home/vacman/.opam/homework/lib/ppx_expect/config/expect_test_config.cmxa lib/parser/parser.cmxa /home/vacman/.opam/homework/lib/ppx_inline_test/runner/lib/ppx_inline_test_runner_lib.cmxa -I /home/vacman/.opam/homework/lib/ppx_inline_test/runner/lib /home/vacman/.opam/homework/lib/stdio/stdio.cmxa /home/vacman/.opam/homework/lib/re/re.cmxa /home/vacman/.opam/homework/lib/ppx_expect/matcher/expect_test_matcher.cmxa /home/vacman/.opam/homework/lib/ppxlib/print_diff/ppxlib_print_diff.cmxa /home/vacman/.opam/homework/lib/ppx_expect/make_corrected_file/make_corrected_file.cmxa /home/vacman/.opam/homework/lib/ppx_expect/evaluator/ppx_expect_evaluator.cmxa lib/parser/.parser.inline-tests/.parser.inline-tests.eobjs/native/dune__exe__Inline_test_runner_parser.cmx -linkall)
+$ (cd _build/.sandbox/8d016f150e5b0058afa576483661ddf4/default/lib/parser && .parser.inline-tests/inline_test_runner_parser.exe inline-test-runner parser -source-tree-root ../.. -diff-cmd -)
