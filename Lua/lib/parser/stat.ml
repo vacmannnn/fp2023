@@ -165,11 +165,11 @@ let%expect_test "parse if5" =
   pp pp_block parse_block "if x == 3 then x = 2 end" ;
   [%expect
     {|
-     [(Stat_if (
-         [((Exp_op (Op_eq, (Exp_lhs (Lhs_ident "x")), (Exp_number 3.))),
-           [(Stat_assign (Nonlocal, (Lhs_ident "x"), (Exp_number 2.)))])],
-         None))
-       ] |}]
+    [(Stat_if (
+        [((Exp_op (Op_eq, (Exp_lhs (Lhs_ident "x")), (Exp_number 3.))),
+          [(Stat_assign (Nonlocal, (Lhs_ident "x"), (Exp_number 2.)))])],
+        None))
+      ] |}]
 
 let%expect_test "parse_fun" =
   pp pp_expression
@@ -192,10 +192,10 @@ let%expect_test "parse_arith" =
   pp pp_expression (parse_expr parse_block) "1 * 2 * 3 + 5 * 6" ;
   [%expect
     {|
-     (Exp_op (Op_add,
-        (Exp_op (Op_mul, (Exp_op (Op_mul, (Exp_number 1.), (Exp_number 2.))),
-           (Exp_number 3.))),
-        (Exp_op (Op_mul, (Exp_number 5.), (Exp_number 6.))))) |}]
+    (Exp_op (Op_add,
+       (Exp_op (Op_mul, (Exp_op (Op_mul, (Exp_number 1.), (Exp_number 2.))),
+          (Exp_number 3.))),
+       (Exp_op (Op_mul, (Exp_number 5.), (Exp_number 6.))))) |}]
 
 let%expect_test "parse_arith2" =
   pp pp_expression (parse_expr parse_block) "abc + 1" ;
@@ -206,24 +206,54 @@ let%expect_test "parse_arith3" =
   pp pp_expression (parse_expr parse_block) "abc - 1 == 3" ;
   [%expect
     {|
-     (Exp_op (Op_eq,
-        (Exp_op (Op_sub, (Exp_lhs (Lhs_ident "abc")), (Exp_number 1.))),
-        (Exp_number 3.))) |}]
+    (Exp_op (Op_eq,
+       (Exp_op (Op_sub, (Exp_lhs (Lhs_ident "abc")), (Exp_number 1.))),
+       (Exp_number 3.))) |}]
 
-let%expect_test "parse_arith4" = pp pp_expression (parse_expr parse_block) "1/1";
+let%expect_test "parse_arith4" =
+  pp pp_expression (parse_expr parse_block) "1/1" ;
   [%expect {| (Exp_op (Op_div, (Exp_number 1.), (Exp_number 1.))) |}]
 
-(* let%expect_test "parse_fun2" =
-   pp pp_block parse_block
-     "function fact (n) if n == 0 then return 1 else return n * fact(n-1) end \
-      end" *)
+let%expect_test "parse_fun2" =
+  pp pp_block parse_block
+    {| function fact(n)
+           if n == 0 then return 1 else return n * fact(n - 1) end
+       end |} ;
+  [%expect
+    {|
+    [(Stat_assign (Nonlocal, (Lhs_ident "fact"),
+        (Exp_function (["n"],
+           [(Stat_if (
+               [((Exp_op (Op_eq, (Exp_lhs (Lhs_ident "n")), (Exp_number 0.))),
+                 [(Stat_return [(Exp_number 1.)])])],
+               (Some [(Stat_return
+                         [(Exp_op (Op_mul, (Exp_lhs (Lhs_ident "n")),
+                             (Exp_call ((Exp_lhs (Lhs_ident "fact")),
+                                [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")),
+                                    (Exp_number 1.)))
+                                  ]
+                                ))
+                             ))
+                           ])
+                       ])
+               ))
+             ]
+           ))
+        ))
+      ] |}]
 
-(* let%expect_test "parse_call" =
-   pp pp_expression (parse_expr parse_block) "fact(n-1)" ;
-   [%expect
-     {|
+let%expect_test "parse_call" =
+  pp pp_expression (parse_expr parse_block) "fact(n-1)" ;
+  [%expect
+    {|
      (Exp_call ((Exp_lhs (Lhs_ident "fact")),
-        [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))])) |}] *)
-(*
-   let%expect_test "parse_call2" =
-     pp pp_expression (parse_expr parse_block) "n * fact(n-1)" *)
+        [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))])) |}]
+
+let%expect_test "parse_call2" =
+  pp pp_expression (parse_expr parse_block) "n * fact(n-1)" ;
+  [%expect
+    {|
+    (Exp_op (Op_mul, (Exp_lhs (Lhs_ident "n")),
+       (Exp_call ((Exp_lhs (Lhs_ident "fact")),
+          [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))]))
+       )) |}]

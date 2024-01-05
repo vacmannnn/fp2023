@@ -26,6 +26,23 @@ let parse_function parse_block =
     (ws *> string "function" *> ws *> parse_idents)
     (parse_block <* string "end")
 
+let parse_call pexpr =
+  lift2
+    (fun e1 e2 -> Exp_call (e1, e2))
+    (ws *> parse_explhs <* ws <* string "(")
+    (sep_by (string ",") (ws *> pexpr) <* string ")")
+
+let parse_single_expr pblock pexpr =
+  ws
+  *> choice
+       [ parse_function pblock
+       ; parse_call pexpr
+       ; parse_false
+       ; parse_true
+       ; parse_nil
+       ; parse_number
+       ; parse_explhs ]
+
 let pmul = string "*" *> return (fun x y -> Exp_op (Op_mul, x, y))
 
 let pdiv = string "/" *> return (fun x y -> Exp_op (Op_div, x, y))
@@ -50,39 +67,11 @@ let pand = string "and" *> return (fun x y -> Exp_op (Op_and, x, y))
 
 let por = string "or" *> return (fun x y -> Exp_op (Op_or, x, y))
 
-(* change pow priority *)
-let parse_op pblock =
-  let pth =
-    ws *> choice [parse_number; parse_false; parse_explhs; parse_function pblock]
-    (* по-хорошему тут вместо этого должно быть `ws *> pexpr`
-       и тогда в [parse_expr] вызов `parse_op pexpr`, но уходит в рекурсию *)
-  in
-  let pep = chainl1 pth (ws *> (ppow <|> pmul <|> pdiv)) in
-  let pep = chainl1 pep (ws *> (padd <|> psub)) in
-  let pep = chainl1 pep (ws *> (peq <|> plt <|> ple <|> pand <|> por)) in
-  pep
-
-let parse_call pexpr =
-  lift2
-    (fun e1 e2 -> Exp_call (e1, e2))
-    (ws *> parse_explhs <* ws <* string "(")
-    (sep_by (string ",") (ws *> parse_op pexpr) <* string ")")
-
 let parse_expr pblock =
   fix (fun pexpr ->
-      ws
-      *> choice
-           [ parse_function pblock
-             (* ; parse_call pexpr *)
-             (* проблема опять с рекурсией, он неправильно парсит в этом порядке *)
-           ; parse_op pblock
-             (* если pares_op pblock поставить в конец, то
-                он перестанет правильно парсить *)
-           ; parse_false
-           ; parse_true
-           ; parse_nil
-           ; parse_number
-           ; parse_explhs
-             (* вот если сюда переставить `parse_op pblock` то будет плохо, т.к.
-                , как я понимаю, он сначала парсит число, а уже потом пробует
-                парсить операции *) ] )
+      let pep =
+        chainl1 (parse_single_expr pblock pexpr) (ws *> (ppow <|> pmul <|> pdiv))
+      in
+      let pep = chainl1 pep (ws *> (padd <|> psub)) in
+      let pep = chainl1 pep (ws *> (peq <|> plt <|> ple <|> pand <|> por)) in
+      chainl1 pep (ws *> (peq <|> plt <|> ple <|> pand <|> por)) )
