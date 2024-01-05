@@ -151,22 +151,23 @@ let%expect_test "parse_if3" =
       ] |}]
 
 let%expect_test "parse_if4" =
-  pp pp_block parse_block "if nil then a = 1 elseif true then a = 2 end" ;
+  pp pp_block parse_block "if a >= 100 then a = 1 elseif true then a = 2 end" ;
   [%expect
     {|
     [(Stat_if (
-        [(Exp_nil, [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 1.)))]);
+        [((Exp_op (Op_le, (Exp_number 100.), (Exp_lhs (Lhs_ident "a")))),
+          [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 1.)))]);
           (Exp_true, [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 2.)))])
           ],
         None))
       ] |}]
 
 let%expect_test "parse if5" =
-  pp pp_block parse_block "if x == 3 then x = 2 end" ;
+  pp pp_block parse_block "if x <= 3 then x = 2 end" ;
   [%expect
     {|
     [(Stat_if (
-        [((Exp_op (Op_eq, (Exp_lhs (Lhs_ident "x")), (Exp_number 3.))),
+        [((Exp_op (Op_le, (Exp_lhs (Lhs_ident "x")), (Exp_number 3.))),
           [(Stat_assign (Nonlocal, (Lhs_ident "x"), (Exp_number 2.)))])],
         None))
       ] |}]

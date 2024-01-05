@@ -53,15 +53,17 @@ let psub = string "-" *> return (fun x y -> Exp_op (Op_sub, x, y))
 
 let pmod = string "%" *> return (fun x y -> Exp_op (Op_mod, x, y))
 
-let ppow = string "^" *> return (fun x y -> Exp_op (Op_pow, x, y))
-
 let pcon = string ".." *> return (fun x y -> Exp_op (Op_concat, x, y))
 
 let peq = string "==" *> return (fun x y -> Exp_op (Op_eq, x, y))
 
 let plt = string "<" *> return (fun x y -> Exp_op (Op_lt, x, y))
 
+let pgt = string ">" *> return (fun x y -> Exp_op (Op_lt, y, x))
+
 let ple = string "<=" *> return (fun x y -> Exp_op (Op_le, x, y))
+
+let pge = string ">=" *> return (fun x y -> Exp_op (Op_le, y, x))
 
 let pand = string "and" *> return (fun x y -> Exp_op (Op_and, x, y))
 
@@ -70,8 +72,12 @@ let por = string "or" *> return (fun x y -> Exp_op (Op_or, x, y))
 let parse_expr pblock =
   fix (fun pexpr ->
       let pep =
-        chainl1 (parse_single_expr pblock pexpr) (ws *> (ppow <|> pmul <|> pdiv))
+        chainl1 (parse_single_expr pblock pexpr) (ws *> (pcon <|> pmul <|> pdiv))
       in
       let pep = chainl1 pep (ws *> (padd <|> psub)) in
-      let pep = chainl1 pep (ws *> (peq <|> plt <|> ple <|> pand <|> por)) in
-      chainl1 pep (ws *> (peq <|> plt <|> ple <|> pand <|> por)) )
+      let pep =
+        chainl1 pep
+          (ws *> (peq <|> ple <|> plt <|> pge <|> pgt <|> pand <|> por))
+      in
+      pep )
+(* chainl1 pep (ws *> (peq <|> plt <|> ple <|> pge <|> pgt <|> pand <|> por)) ) *)
