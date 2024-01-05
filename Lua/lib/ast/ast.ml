@@ -40,7 +40,6 @@ and op_id =
   | Op_div  (** E1 / E2 *)
   | Op_sub  (** E1 - E2 *)
   | Op_mod  (** E1 % E2 *)
-  | Op_pow  (** E1 ^ E2 *)
   | Op_concat  (** E1 .. E2 *)
   | Op_eq  (** E1 == E2 *)
   | Op_lt  (** E1 < E2 *)
