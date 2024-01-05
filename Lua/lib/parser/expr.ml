@@ -15,19 +15,6 @@ let parse_number =
   try return (Exp_number (Float.of_string s))
   with Invalid_argument _ -> fail "not a number"
 
-(* let parse_opid pexpr =
-   let parse_op =
-     ws
-     *> choice
-          [ string "+" *> return Op_add
-          ; string "-" *> return Op_sub
-          ; string "<=" *> return Op_le ]
-   in
-   let parse_expr2 = option None (pexpr >>| Option.some) in
-   lift3
-     (fun exp1 opid exp2 -> Exp_op (opid, exp1, exp2))
-     pexpr parse_op parse_expr2 *)
-
 let parse_explhs = parse_lhs >>| fun lhs -> Exp_lhs lhs
 
 let parse_function parse_block =
@@ -38,67 +25,55 @@ let parse_function parse_block =
     (fun idents bl -> Exp_function (idents, bl))
     (ws *> string "function" *> ws *> parse_idents)
     (parse_block <* string "end")
-(*
-   let chainl1 e op =
-     let rec go acc = lift2 (fun f x -> f acc x) op e >>= go <|> return acc in
-     e >>= fun init -> go init
 
-   let rmul =
-     ws *> string "*" *> ws *> return (fun e1 e2 -> Exp_op (Op_mul, e1, e2))
+let pmul = string "*" *> return (fun x y -> Exp_op (Op_mul, x, y))
 
-   let pmul pf = chainl1 pf rmul
+let pdiv = string "/" *> return (fun x y -> Exp_op (Op_div, x, y))
 
-   let rdiv =
-     ws *> string "/" *> ws *> return (fun e1 e2 -> Exp_op (Op_div, e1, e2))
+let padd = string "+" *> return (fun x y -> Exp_op (Op_add, x, y))
 
-   let pdiv pf = chainl1 pf rdiv
+let psub = string "-" *> return (fun x y -> Exp_op (Op_sub, x, y))
 
-   let radd =
-     ws *> string "+" *> ws *> return (fun e1 e2 -> Exp_op (Op_add, e1, e2))
+let pmod = string "%" *> return (fun x y -> Exp_op (Op_mod, x, y))
 
-   let padd pf = chainl1 pf radd
+let ppow = string "^" *> return (fun x y -> Exp_op (Op_pow, x, y))
 
-   let rsub =
-     ws *> string "-" *> ws *> return (fun e1 e2 -> Exp_op (Op_sub, e1, e2))
+let pcon = string ".." *> return (fun x y -> Exp_op (Op_concat, x, y))
 
-   let psub pf = chainl1 pf rsub
+let peq = string "==" *> return (fun x y -> Exp_op (Op_eq, x, y))
 
-   let rmod =
-     ws *> string "%" *> ws *> return (fun e1 e2 -> Exp_op (Op_mod, e1, e2))
+let plt = string "<" *> return (fun x y -> Exp_op (Op_lt, x, y))
 
-   let pmod pf = chainl1 pf rmod
+let ple = string "<=" *> return (fun x y -> Exp_op (Op_le, x, y))
 
-   let req =
-     ws *> string "==" *> ws *> return (fun e1 e2 -> Exp_op (Op_eq, e1, e2))
+let pand = string "and" *> return (fun x y -> Exp_op (Op_and, x, y))
 
-   let peq pf = chainl1 pf req
+let por = string "or" *> return (fun x y -> Exp_op (Op_or, x, y))
 
-   let rlt = ws *> string "<" *> ws *> return (fun e1 e2 -> Exp_op (Op_lt, e1, e2))
+(** pow bad parsing *)
+let parse_op pexpr =
+  let pth = ws *> pexpr in
+  let pep = chainl1 pth (ws *> (ppow <|> pmul <|> pdiv)) in
+  let pep = chainl1 pep (ws *> (padd <|> psub)) in
+  let pep = chainl1 pep (ws *> (peq <|> plt <|> ple <|> pand <|> por)) in
+  pep
 
-   let plt pf = chainl1 pf radd *)
-(*
-   let rle =
-     ws *> string "<=" *> ws *> return (fun e1 e2 -> Exp_op (Op_le, e1, e2))
-
-   let ple pf = chainl1 pf rle
-
-   let parith p =
-     let p = pmul p <|> p in
-     let p = pdiv p <|> p in
-     let p = padd p <|> p in
-     let p = psub p <|> p in
-     let p = pmod p <|> p in
-     let p = peq p <|> p in
-     let p = plt p <|> p in
-     let p = ple p <|> p in
-     p *)
+let parse_call pexpr =
+  lift2
+    (fun e1 e2 -> Exp_call (e1, e2))
+    (ws *> parse_explhs <* ws <* string "(")
+    (sep_by (string ",") (ws *> (parse_op pexpr <|> parse_explhs)) <* string ")")
+(* (many (ws *> pexpr <* string ",") <* ws <* string ")") *)
 
 let parse_expr pblock =
-  ws
-  *> choice
-       [ parse_function pblock
-       ; parse_true
-       ; parse_false
-       ; parse_nil
-       ; parse_number
-       ; parse_explhs ]
+  fix (fun pexpr ->
+      ws
+      *> choice
+           [ parse_call pexpr
+           ; parse_function pblock
+           ; parse_false
+           ; parse_true
+           ; parse_nil
+           ; parse_number
+           ; parse_explhs
+           ; parse_op pexpr ] )

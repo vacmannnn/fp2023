@@ -10,7 +10,8 @@ and statement =
       (** [ if E1 then B1 [elseif E2 then B2] ...  [else BN] end ] *)
   | Stat_return of expression list  (** [ return E1, E2 ... ] *)
   | Stat_break  (** [ break ] *)
-  | Stat_call of expression * expression list  (** [ E1(E2, ... En) ] *)
+  | Stat_call of expression * expression list
+      (** [ E1(E2, ... En) ], print(1) *)
 [@@deriving show {with_path= false}]
 
 and expression =
@@ -37,10 +38,10 @@ and op_id =
   | Op_add  (** E1 + E2 *)
   | Op_mul  (** E1 * E2 *)
   | Op_div  (** E1 / E2 *)
-  | Op_sub  (** E1 + E2 *)
-  | Op_mod  (** E1 + E2 *)
-  | Op_pow  (** E1 + E2 *)
-  | Op_concat  (** E1 ^ E2 *)
+  | Op_sub  (** E1 - E2 *)
+  | Op_mod  (** E1 % E2 *)
+  | Op_pow  (** E1 ^ E2 *)
+  | Op_concat  (** E1 .. E2 *)
   | Op_eq  (** E1 == E2 *)
   | Op_lt  (** E1 < E2 *)
   | Op_le  (** E1 <= E2 *)

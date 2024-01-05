@@ -14,3 +14,5 @@ val ws : unit t
 val parse_lhs : lhs t
 
 val parse_ident : ident t
+
+val chainl1 : 'a t -> ('a -> 'a -> 'a) t -> 'a t
