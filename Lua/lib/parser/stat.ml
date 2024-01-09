@@ -49,6 +49,8 @@ let parse_while pblock =
   let parse_pblock = ws *> string "do" *> pblock <* ws <* string "end" in
   lift2 (fun exp block -> Stat_while (exp, block)) parse_while1 parse_pblock
 
+let parse_stcall pexpr = parse_apply pexpr >>| fun e1 -> Stat_call e1
+
 let parse_do pblock =
   string "do" *> pblock <* ws <* string "end" >>| fun block -> Stat_do block
 
@@ -66,12 +68,18 @@ let parse_stat pblock =
        ; parse_do pblock
        ; parse_while pblock
        ; parse_return pblock
+       ; parse_stcall (parse_expr pblock)
        ; parse_break ]
 
 let parse_block : block t = fix (fun pblock -> many (parse_stat pblock) <* ws)
 (* TODO: retstat *)
 
 (* ======= Tests ======= *)
+
+let%expect_test "parse_callfun" =
+  pp pp_block parse_block "print(10)" ;
+  [%expect
+    {| [(Stat_call (Call ((Exp_lhs (Lhs_ident "print")), [(Exp_number 10.)])))] |}]
 
 let%expect_test "parse_while" =
   pp pp_block parse_block "while false do x = 1 end" ;
@@ -229,11 +237,12 @@ let%expect_test "parse_fun2" =
                  [(Stat_return [(Exp_number 1.)])])],
                (Some [(Stat_return
                          [(Exp_op (Op_mul, (Exp_lhs (Lhs_ident "n")),
-                             (Exp_call ((Exp_lhs (Lhs_ident "fact")),
-                                [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")),
-                                    (Exp_number 1.)))
-                                  ]
-                                ))
+                             (Exp_call
+                                (Call ((Exp_lhs (Lhs_ident "fact")),
+                                   [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")),
+                                       (Exp_number 1.)))
+                                     ]
+                                   )))
                              ))
                            ])
                        ])
@@ -247,14 +256,16 @@ let%expect_test "parse_call" =
   pp pp_expression (parse_expr parse_block) "fact(n-1)" ;
   [%expect
     {|
-     (Exp_call ((Exp_lhs (Lhs_ident "fact")),
-        [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))])) |}]
+     (Exp_call
+        (Call ((Exp_lhs (Lhs_ident "fact")),
+           [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))]))) |}]
 
 let%expect_test "parse_call2" =
   pp pp_expression (parse_expr parse_block) "n * fact(n-1)" ;
   [%expect
     {|
     (Exp_op (Op_mul, (Exp_lhs (Lhs_ident "n")),
-       (Exp_call ((Exp_lhs (Lhs_ident "fact")),
-          [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))]))
+       (Exp_call
+          (Call ((Exp_lhs (Lhs_ident "fact")),
+             [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))])))
        )) |}]

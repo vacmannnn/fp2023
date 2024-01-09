@@ -26,17 +26,19 @@ let parse_function parse_block =
     (ws *> string "function" *> ws *> parse_idents)
     (parse_block <* string "end")
 
-let parse_call pexpr =
+let parse_apply pexpr =
   lift2
-    (fun e1 e2 -> Exp_call (e1, e2))
+    (fun e1 e2 -> Call (e1, e2))
     (ws *> parse_explhs <* ws <* string "(")
     (sep_by (string ",") (ws *> pexpr) <* string ")")
+
+let parse_expcall pexpr = parse_apply pexpr >>| fun e1 -> Exp_call e1
 
 let parse_single_expr pblock pexpr =
   ws
   *> choice
        [ parse_function pblock
-       ; parse_call pexpr
+       ; parse_expcall pexpr
        ; parse_false
        ; parse_true
        ; parse_nil

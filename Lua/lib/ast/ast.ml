@@ -10,9 +10,11 @@ and statement =
       (** [ if E1 then B1 [elseif E2 then B2] ...  [else BN] end ] *)
   | Stat_return of expression list  (** [ return E1, E2 ... ] *)
   | Stat_break  (** [ break ] *)
-  | Stat_call of expression * expression list
-      (** [ E1(E2, ... En) ], print(1) *)
+  | Stat_call of apply
 [@@deriving show {with_path= false}]
+
+and apply =
+  | Call of expression * expression list  (** [ E1(E2, ... En) ], fact(1) *)
 
 and expression =
   | Exp_nil  (** [ nil ] *)
@@ -23,7 +25,7 @@ and expression =
   | Exp_op of op_id * expression * expression  (** [ E1 op E2 ] *)
   | Exp_function of ident list * block
       (** [ function (Id1,... Idn) ... end ] *)
-  | Exp_call of expression * expression list  (** [ E1(E2, ... En) ] *)
+  | Exp_call of apply
   | Exp_lhs of lhs
 [@@deriving show {with_path= false}]
 
