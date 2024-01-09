@@ -82,4 +82,3 @@ let parse_expr pblock =
           (ws *> (peq <|> ple <|> plt <|> pge <|> pgt <|> pand <|> por))
       in
       pep )
-(* chainl1 pep (ws *> (peq <|> plt <|> ple <|> pge <|> pgt <|> pand <|> por)) ) *)
