@@ -1,0 +1,10 @@
+(library
+ (name interpreter)
+ (public_name Lua.Interpreter)
+ (modules interpreter)
+ (libraries base angstrom ast)
+ (preprocess
+  (pps ppx_expect))
+ (inline_tests)
+ (instrumentation
+  (backend bisect_ppx)))
