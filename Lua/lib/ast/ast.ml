@@ -4,7 +4,7 @@ and local_flag = Local | Nonlocal [@@deriving show {with_path= false}]
 
 and statement =
   | Stat_do of block  (** [ do ... end ] *)
-  | Stat_assign of local_flag * lhs * expression  (** [ [local] LHS = E ] *)
+  | Stat_assign of local_flag * ident * expression  (** [ [local] LHS = E ] *)
   | Stat_while of expression * block  (** [ while E do B end ] *)
   | Stat_if of (expression * block) list * block option
       (** [ if E1 then B1 [elseif E2 then B2] ...  [else BN] end ] *)
@@ -26,7 +26,7 @@ and expression =
   | Exp_function of ident list * block
       (** [ function (Id1,... Idn) ... end ] *)
   | Exp_call of apply
-  | Exp_lhs of lhs
+  | Exp_lhs of ident
 [@@deriving show {with_path= false}]
 
 and lhs =
@@ -51,3 +51,4 @@ and op_id =
   | Op_not  (** not E1 *)
   | Op_len  (** #E1 *)
 [@@deriving show {with_path= false}]
+(* FORGOT NOT EQUAL *)

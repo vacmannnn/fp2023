@@ -12,7 +12,7 @@ let parse_function1 pblock =
     (fun local fun_name idents bl ->
       Stat_assign (local, fun_name, Exp_function (idents, bl)) )
     (option Nonlocal (string "local" *> return Local))
-    (ws *> string "function" *> ws *> parse_lhs)
+    (ws *> string "function" *> ws *> parse_ident)
     (ws *> parse_idents)
     (pblock <* string "end")
 
@@ -20,7 +20,7 @@ let parse_assign pblock =
   (let parse_flag = option Nonlocal (string "local" *> return Local) in
    lift3
      (fun flag lhs expr -> Stat_assign (flag, lhs, expr))
-     parse_flag (ws *> parse_lhs)
+     parse_flag (ws *> parse_ident)
      (ws *> char '=' *> ws *> parse_expr pblock) )
   <|> parse_function1 pblock
 
@@ -76,45 +76,44 @@ let parse_block : block t = fix (fun pblock -> many (parse_stat pblock) <* ws)
 
 (* ======= Tests ======= *)
 
+let%expect_test "parse_assign" =
+  pp pp_block parse_block "x = 42" ;
+  [%expect {| [(Stat_assign (Nonlocal, "x", (Exp_number 42.)))] |}]
+
 let%expect_test "parse_callfun" =
   pp pp_block parse_block "print(10)" ;
-  [%expect
-    {| [(Stat_call (Call ((Exp_lhs (Lhs_ident "print")), [(Exp_number 10.)])))] |}]
+  [%expect {| [(Stat_call (Call ((Exp_lhs "print"), [(Exp_number 10.)])))] |}]
 
 let%expect_test "parse_while" =
   pp pp_block parse_block "while false do x = 1 end" ;
   [%expect
     {|
-    [(Stat_while (Exp_false,
-        [(Stat_assign (Nonlocal, (Lhs_ident "x"), (Exp_number 1.)))]))
-      ] |}]
+    [(Stat_while (Exp_false, [(Stat_assign (Nonlocal, "x", (Exp_number 1.)))]))] |}]
 
 let%expect_test "parse_while" =
   pp pp_block parse_block "while 9 do x = 1 b = 2 end" ;
   [%expect
     {|
           [(Stat_while ((Exp_number 9.),
-              [(Stat_assign (Nonlocal, (Lhs_ident "x"), (Exp_number 1.)));
-                (Stat_assign (Nonlocal, (Lhs_ident "b"), (Exp_number 2.)))]
+              [(Stat_assign (Nonlocal, "x", (Exp_number 1.)));
+                (Stat_assign (Nonlocal, "b", (Exp_number 2.)))]
               ))
             ] |}]
 
 let%expect_test "parse_return" =
   pp pp_block parse_block "return 10, true, a" ;
-  [%expect
-    {| [(Stat_return [(Exp_number 10.); Exp_true; (Exp_lhs (Lhs_ident "a"))])] |}]
+  [%expect {| [(Stat_return [(Exp_number 10.); Exp_true; (Exp_lhs "a")])] |}]
 
 let%expect_test "parse_do" =
   pp pp_block parse_block "do a = 1 b = 2 if true then c = 3 end end" ;
   [%expect
     {|
     [(Stat_do
-        [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 1.)));
-          (Stat_assign (Nonlocal, (Lhs_ident "b"), (Exp_number 2.)));
+        [(Stat_assign (Nonlocal, "a", (Exp_number 1.)));
+          (Stat_assign (Nonlocal, "b", (Exp_number 2.)));
           (Stat_if (
-             [(Exp_true,
-               [(Stat_assign (Nonlocal, (Lhs_ident "c"), (Exp_number 3.)))])],
-             None))
+             [(Exp_true, [(Stat_assign (Nonlocal, "c", (Exp_number 3.)))])], None
+             ))
           ])
       ] |}]
 
@@ -124,8 +123,8 @@ let%expect_test "parse_if" =
     {|
     [(Stat_if (
         [(Exp_true,
-          [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 1.)));
-            (Stat_assign (Nonlocal, (Lhs_ident "b"), (Exp_number 2.)))])
+          [(Stat_assign (Nonlocal, "a", (Exp_number 1.)));
+            (Stat_assign (Nonlocal, "b", (Exp_number 2.)))])
           ],
         None))
       ] |}]
@@ -139,23 +138,20 @@ let%expect_test "parse_if2" =
   [%expect
     {|
     [(Stat_if (
-        [(Exp_false, [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 1.)))]);
+        [(Exp_false, [(Stat_assign (Nonlocal, "a", (Exp_number 1.)))]);
           (Exp_true,
-           [(Stat_assign (Nonlocal, (Lhs_ident "b"), (Exp_number 2.)));
-             (Stat_assign (Nonlocal, (Lhs_ident "c"), (Exp_number 3.)))]);
-          ((Exp_number 42.),
-           [(Stat_assign (Nonlocal, (Lhs_ident "d"), (Exp_number 4.)))])
-          ],
-        (Some [(Stat_assign (Nonlocal, (Lhs_ident "e"), (Exp_number 5.)))])))
+           [(Stat_assign (Nonlocal, "b", (Exp_number 2.)));
+             (Stat_assign (Nonlocal, "c", (Exp_number 3.)))]);
+          ((Exp_number 42.), [(Stat_assign (Nonlocal, "d", (Exp_number 4.)))])],
+        (Some [(Stat_assign (Nonlocal, "e", (Exp_number 5.)))])))
       ] |}]
 
 let%expect_test "parse_if3" =
   pp pp_block parse_block "if nil then a = 1 else a = 2 end" ;
   [%expect
     {|
-    [(Stat_if (
-        [(Exp_nil, [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 1.)))])],
-        (Some [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 2.)))])))
+    [(Stat_if ([(Exp_nil, [(Stat_assign (Nonlocal, "a", (Exp_number 1.)))])],
+        (Some [(Stat_assign (Nonlocal, "a", (Exp_number 2.)))])))
       ] |}]
 
 let%expect_test "parse_if4" =
@@ -163,10 +159,9 @@ let%expect_test "parse_if4" =
   [%expect
     {|
     [(Stat_if (
-        [((Exp_op (Op_le, (Exp_number 100.), (Exp_lhs (Lhs_ident "a")))),
-          [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 1.)))]);
-          (Exp_true, [(Stat_assign (Nonlocal, (Lhs_ident "a"), (Exp_number 2.)))])
-          ],
+        [((Exp_op (Op_le, (Exp_number 100.), (Exp_lhs "a"))),
+          [(Stat_assign (Nonlocal, "a", (Exp_number 1.)))]);
+          (Exp_true, [(Stat_assign (Nonlocal, "a", (Exp_number 2.)))])],
         None))
       ] |}]
 
@@ -175,8 +170,8 @@ let%expect_test "parse if5" =
   [%expect
     {|
     [(Stat_if (
-        [((Exp_op (Op_le, (Exp_lhs (Lhs_ident "x")), (Exp_number 3.))),
-          [(Stat_assign (Nonlocal, (Lhs_ident "x"), (Exp_number 2.)))])],
+        [((Exp_op (Op_le, (Exp_lhs "x"), (Exp_number 3.))),
+          [(Stat_assign (Nonlocal, "x", (Exp_number 2.)))])],
         None))
       ] |}]
 
@@ -186,15 +181,14 @@ let%expect_test "parse_fun" =
     "function (x,y,z,v) return x    end" ;
   [%expect
     {|
-       (Exp_function (["x"; "y"; "z"; "v"],
-          [(Stat_return [(Exp_lhs (Lhs_ident "x"))])])) |}]
+       (Exp_function (["x"; "y"; "z"; "v"], [(Stat_return [(Exp_lhs "x")])])) |}]
 
 let%expect_test "parse_fun2" =
   pp pp_block parse_block "local function abc (x) return x end" ;
   [%expect
     {|
-           [(Stat_assign (Local, (Lhs_ident "abc"),
-               (Exp_function (["x"], [(Stat_return [(Exp_lhs (Lhs_ident "x"))])]))))
+           [(Stat_assign (Local, "abc",
+               (Exp_function (["x"], [(Stat_return [(Exp_lhs "x")])]))))
              ] |}]
 
 let%expect_test "parse_arith" =
@@ -208,15 +202,13 @@ let%expect_test "parse_arith" =
 
 let%expect_test "parse_arith2" =
   pp pp_expression (parse_expr parse_block) "abc + 1" ;
-  [%expect
-    {| (Exp_op (Op_add, (Exp_lhs (Lhs_ident "abc")), (Exp_number 1.))) |}]
+  [%expect {| (Exp_op (Op_add, (Exp_lhs "abc"), (Exp_number 1.))) |}]
 
 let%expect_test "parse_arith3" =
   pp pp_expression (parse_expr parse_block) "abc - 1 == 3" ;
   [%expect
     {|
-    (Exp_op (Op_eq,
-       (Exp_op (Op_sub, (Exp_lhs (Lhs_ident "abc")), (Exp_number 1.))),
+    (Exp_op (Op_eq, (Exp_op (Op_sub, (Exp_lhs "abc"), (Exp_number 1.))),
        (Exp_number 3.))) |}]
 
 let%expect_test "parse_arith4" =
@@ -230,16 +222,16 @@ let%expect_test "parse_fun2" =
        end |} ;
   [%expect
     {|
-    [(Stat_assign (Nonlocal, (Lhs_ident "fact"),
+    [(Stat_assign (Nonlocal, "fact",
         (Exp_function (["n"],
            [(Stat_if (
-               [((Exp_op (Op_eq, (Exp_lhs (Lhs_ident "n")), (Exp_number 0.))),
+               [((Exp_op (Op_eq, (Exp_lhs "n"), (Exp_number 0.))),
                  [(Stat_return [(Exp_number 1.)])])],
                (Some [(Stat_return
-                         [(Exp_op (Op_mul, (Exp_lhs (Lhs_ident "n")),
+                         [(Exp_op (Op_mul, (Exp_lhs "n"),
                              (Exp_call
-                                (Call ((Exp_lhs (Lhs_ident "fact")),
-                                   [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")),
+                                (Call ((Exp_lhs "fact"),
+                                   [(Exp_op (Op_sub, (Exp_lhs "n"),
                                        (Exp_number 1.)))
                                      ]
                                    )))
@@ -257,15 +249,15 @@ let%expect_test "parse_call" =
   [%expect
     {|
      (Exp_call
-        (Call ((Exp_lhs (Lhs_ident "fact")),
-           [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))]))) |}]
+        (Call ((Exp_lhs "fact"),
+           [(Exp_op (Op_sub, (Exp_lhs "n"), (Exp_number 1.)))]))) |}]
 
 let%expect_test "parse_call2" =
   pp pp_expression (parse_expr parse_block) "n * fact(n-1)" ;
   [%expect
     {|
-    (Exp_op (Op_mul, (Exp_lhs (Lhs_ident "n")),
+    (Exp_op (Op_mul, (Exp_lhs "n"),
        (Exp_call
-          (Call ((Exp_lhs (Lhs_ident "fact")),
-             [(Exp_op (Op_sub, (Exp_lhs (Lhs_ident "n")), (Exp_number 1.)))])))
+          (Call ((Exp_lhs "fact"),
+             [(Exp_op (Op_sub, (Exp_lhs "n"), (Exp_number 1.)))])))
        )) |}]

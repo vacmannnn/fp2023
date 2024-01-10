@@ -15,7 +15,7 @@ let parse_number =
   try return (Exp_number (Float.of_string s))
   with Invalid_argument _ -> fail "not a number"
 
-let parse_explhs = parse_lhs >>| fun lhs -> Exp_lhs lhs
+let parse_explhs = parse_ident >>| fun lhs -> Exp_lhs lhs
 
 let parse_function parse_block =
   let parse_idents =
