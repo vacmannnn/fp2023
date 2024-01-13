@@ -8,7 +8,9 @@ and statement =
   | Stat_while of expression * block  (** [ while E do B end ] *)
   | Stat_if of (expression * block) list * block option
       (** [ if E1 then B1 [elseif E2 then B2] ...  [else BN] end ] *)
-  | Stat_return of expression list  (** [ return E1, E2 ... ] *)
+  | Stat_return of expression list
+      (** [ return E1, E2 ... ] -- DONE частично, переделать на * expr без листа *)
+  (* в теории возвращаем всегда только 1 элемент *)
   | Stat_break  (** [ break ] *)
   | Stat_call of apply
 [@@deriving show {with_path= false}]
@@ -17,16 +19,17 @@ and apply =
   | Call of expression * expression list  (** [ E1(E2, ... En) ], fact(1) *)
 
 and expression =
-  | Exp_nil  (** [ nil ] *)
-  | Exp_true  (** [ true ] *)
-  | Exp_false  (** [ false ] *)
-  | Exp_number of float  (** [ 42 ] *)
-  | Exp_string of string  (** [ "lua" ] *)
-  | Exp_op of op_id * expression * expression  (** [ E1 op E2 ] *)
+  | Exp_nil  (** [ nil ] -- DONE *)
+  | Exp_true  (** [ true ] -- DONE *)
+  | Exp_false  (** [ false ] -- DONE *)
+  | Exp_number of float  (** [ 42 ] -- DONE *)
+  | Exp_string of string  (** [ "lua" ] -- DONE *)
+  | Exp_op of op_id * expression * expression
+      (** [ E1 op E2 ] -- DONE particulary *)
   | Exp_function of ident list * block
       (** [ function (Id1,... Idn) ... end ] *)
   | Exp_call of apply
-  | Exp_lhs of ident
+  | Exp_lhs of ident (* -- DONE *)
 [@@deriving show {with_path= false}]
 
 and lhs =

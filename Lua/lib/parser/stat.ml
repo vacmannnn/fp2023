@@ -77,18 +77,28 @@ let parse_block : block t = fix (fun pblock -> many (parse_stat pblock) <* ws)
 (* ======= Tests ======= *)
 
 let%expect_test "parse_assign" =
-  pp pp_block parse_block "x = 42" ;
-  [%expect {| [(Stat_assign (Nonlocal, "x", (Exp_number 42.)))] |}]
+  pp pp_block parse_block "x = 42 < 15" ;
+  [%expect
+    {|
+    [(Stat_assign (Nonlocal, "x",
+        (Exp_op (Op_lt, (Exp_number 42.), (Exp_number 15.)))))
+      ] |}]
 
 let%expect_test "parse_callfun" =
   pp pp_block parse_block "print(10)" ;
   [%expect {| [(Stat_call (Call ((Exp_lhs "print"), [(Exp_number 10.)])))] |}]
 
 let%expect_test "parse_while" =
-  pp pp_block parse_block "while false do x = 1 end" ;
+  pp pp_block parse_block "x = 15 while x > 10 do x = x - 4 end" ;
   [%expect
     {|
-    [(Stat_while (Exp_false, [(Stat_assign (Nonlocal, "x", (Exp_number 1.)))]))] |}]
+    [(Stat_assign (Nonlocal, "x", (Exp_number 15.)));
+      (Stat_while ((Exp_op (Op_lt, (Exp_number 10.), (Exp_lhs "x"))),
+         [(Stat_assign (Nonlocal, "x",
+             (Exp_op (Op_sub, (Exp_lhs "x"), (Exp_number 4.)))))
+           ]
+         ))
+      ] |}]
 
 let%expect_test "parse_while" =
   pp pp_block parse_block "while 9 do x = 1 b = 2 end" ;
