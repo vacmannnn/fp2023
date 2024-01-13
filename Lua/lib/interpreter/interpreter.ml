@@ -204,6 +204,29 @@ module Eval (M : MONADERROR) = struct
         error "Error: Unexpected break statement"
     | Stat_while (e, bal) ->
         set_hd_is_loop env_lst >>= fun env_lst -> eval_while e bal env_lst
+    | Stat_if (body, tail) ->
+        let rec evalif env_lst tail = function
+          | [] -> (
+            match tail with
+            | None ->
+                return []
+            | Some block ->
+                eval_block env_lst block )
+          | [body] -> (
+            match body with
+            | pred, st ->
+                eval_expr env_lst pred
+                >>= fun res ->
+                if is_true res then eval_block env_lst st else return [] )
+          | bd :: tl -> (
+            match bd with
+            | pred, st ->
+                eval_expr env_lst pred
+                >>= fun res ->
+                if is_true res then eval_block env_lst st
+                else evalif env_lst tail tl )
+        in
+        evalif env_lst tail body
     | _ ->
         error "sad"
 
@@ -337,11 +360,7 @@ module Eval (M : MONADERROR) = struct
     let prev_env = get_prev_env env_lst in
     set_hd_jump_stmt Break prev_env >>= fun env -> set_parents_is_loop env
 
-  and eval_prog = function
-    | None ->
-        error "Syntax error occured"
-    | Some p ->
-        eval_block (create_next_env []) p
+  and eval_prog block = eval_block (create_next_env []) block
 end
 
 open Eval (Result)
@@ -357,15 +376,39 @@ let eval parsed_prog =
   | Error msg ->
       print_endline msg
 
+let%expect_test "woeworwo" =
+  eval (Parser.parse_exn "x = 15 while x > 10 do x = x - 4 end") ;
+  [%expect
+    {|
+    { vars = [["x" -> (Exp_number 7.)
+
+    ]]
+    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    } |}]
+
+let%expect_test "how" =
+  eval
+    [ Stat_assign (Nonlocal, "x", Exp_number 100.)
+    ; Stat_if
+        ( [ ( Exp_op (Op_eq, Exp_lhs "x", Exp_number 100.)
+            , [Stat_assign (Nonlocal, "x", Exp_number 10.)] ) ]
+        , None ) ] ;
+  [%expect
+    {|
+    { vars = [["x" -> (Exp_number 10.)
+
+    ]]
+    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    } |}]
+
 let%expect_test "help" =
   eval
-    (Some
-       [ Stat_assign (Nonlocal, "x", Exp_number 15.)
-       ; Stat_while
-           ( Exp_op (Op_lt, Exp_number 10., Exp_lhs "x")
-           , [ Stat_assign
-                 (Nonlocal, "x", Exp_op (Op_sub, Exp_lhs "x", Exp_number 4.)) ]
-           ) ] ) ;
+    [ Stat_assign (Nonlocal, "x", Exp_number 15.)
+    ; Stat_while
+        ( Exp_op (Op_lt, Exp_number 10., Exp_lhs "x")
+        , [ Stat_assign
+              (Nonlocal, "x", Exp_op (Op_sub, Exp_lhs "x", Exp_number 4.)) ] )
+    ] ;
   [%expect
     {|
       { vars = [["x" -> (Exp_number 7.)
@@ -375,7 +418,7 @@ let%expect_test "help" =
       } |}]
 
 let%expect_test "abc" =
-  eval (Some [Stat_assign (Nonlocal, "x", Exp_number 42.)]) ;
+  eval [Stat_assign (Nonlocal, "x", Exp_number 42.)] ;
   [%expect
     {|
     { vars = [["x" -> (Exp_number 42.)
@@ -385,7 +428,7 @@ let%expect_test "abc" =
     } |}]
 
 let%expect_test "abc" =
-  eval (Some [Stat_assign (Nonlocal, "x", Exp_string "whennnnnn")]) ;
+  eval [Stat_assign (Nonlocal, "x", Exp_string "whennnnnn")] ;
   [%expect
     {|
     { vars = [["x" -> (Exp_string "whennnnnn")
@@ -395,12 +438,9 @@ let%expect_test "abc" =
     } |}]
 
 let%expect_test "abc" =
-  eval
-    (Some [Stat_while (Exp_false, [Stat_assign (Nonlocal, "x", Exp_number 1.)])]) ;
+  eval [Stat_while (Exp_false, [Stat_assign (Nonlocal, "x", Exp_number 1.)])] ;
   [%expect
     {|
     { vars = [[]]
       ; last_value = Exp_nil; is_func = false; is_loop = false;
       jump_stmt = Default } |}]
-
-let%expect_test "123" = eval None ; [%expect {| Syntax error occured |}]
