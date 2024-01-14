@@ -8,13 +8,3 @@
  (inline_tests)
  (instrumentation
   (backend bisect_ppx)))
-
-; (library
-;  (name test)
-;  (modules test)
-;  (libraries base ast parser)
-;  (preprocess
-;   (pps ppx_expect))
-;  (inline_tests)
-;  (instrumentation
-;   (backend bisect_ppx)))
