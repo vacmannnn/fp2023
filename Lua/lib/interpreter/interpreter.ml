@@ -1,6 +1,5 @@
 open Ast
 open Hashtbl_p
-open! Var_zipper
 
 module type MONAD = sig
   type 'a t
@@ -50,10 +49,8 @@ module Eval (M : MONADERROR) = struct
     | _ ->
         error msg
 
-  (* Integer division *)
   let ( /// ) x y = Float.floor (x /. y)
 
-  (* Remainder *)
   let ( %% ) x y =
     let int_part = x /// y in
     x -. (int_part *. y)
@@ -80,7 +77,7 @@ module Eval (M : MONADERROR) = struct
           >>= fun op -> if op l r then return Exp_true else return Exp_false
       | _, _ ->
           error "Can't compare not the same types" )
-    | Op_eq -> (
+    | Op_eq | Op_neq -> (
       match (lhs, rhs) with
       | Exp_number l, Exp_number r ->
           get_op op
@@ -155,7 +152,7 @@ module Eval (M : MONADERROR) = struct
               | Op_mod ->
                   (( %% ), "Error: Unsupported operands type for (%)")
               | _ ->
-                  (( +. ), "Бля сюда не попасть")
+                  (( +. ), "Unreachable")
             in
             match get_op op with
             | op, err_msg ->
@@ -165,6 +162,8 @@ module Eval (M : MONADERROR) = struct
             return Exp_nil )
     | Exp_lhs l ->
         find_var l env_lst
+    | Exp_function (ids, bl) ->
+        return (Exp_function (ids, bl))
     | _ ->
         error "Error: Unexpected expression"
 
@@ -227,8 +226,44 @@ module Eval (M : MONADERROR) = struct
                 else evalif env_lst tail tl )
         in
         evalif env_lst tail body
+    (* | Stat_call app ->
+        let ev_exp args = List.map (eval_expr env_lst) args in
+        let call env_lst = function
+          | Call (name, args) ->
+              eval_expr env_lst name >>= fun n -> eval_call env_lst n args
+        in
+        call env_lst app *)
     | _ ->
-        error "sad"
+        error "sad:("
+
+  (* and eval_call env_lst = function
+     | *)
+  (* and eval_call env_lst name fargs =
+     match name with
+     | Exp_lhs a -> (
+         find_var a env_lst
+         >>= function
+         | Exp_function (name, bd) ->
+             let var_args = List.map (fun x -> Exp_lhs x) name in
+             let abc = var_zipper var_args fargs in
+             let block_with_vardec b =
+               return @@ [Stat_assign (Local, "abc", Exp_number 0.1) :: b]
+             in
+             block_with_vardec bd
+             >>= fun b ->
+             set_hd_is_func ~is_func:true env_lst
+             >>= fun env_lst -> eval_block env_lst bd
+         | _ ->
+             error "I dont know this name" )
+     | _ ->
+         error "uncallable type" *)
+
+  and set_hd_is_func ?(is_func = true) = function
+    | [] ->
+        error
+          "Error: Can't modify environment head with <is_func>. Head is absent!"
+    | hd :: tl ->
+        return @@ ({hd with is_func} :: tl)
 
   and eval_while e bal env_lst =
     eval_expr env_lst e
@@ -375,6 +410,61 @@ let eval parsed_prog =
         print_endline "[]" )
   | Error msg ->
       print_endline msg
+
+let%expect_test "fact_interpreter" =
+  eval
+  @@ Parser.parse_exn
+       {| k = 10 
+       i = 1 
+       n = 1 
+       while i <= k do 
+        n = n * i 
+        i = i + 1 
+      end |} ;
+  [%expect
+    {|
+    { vars = [["n" -> (Exp_number 3628800.)
+
+    "k" -> (Exp_number 10.)
+
+    "i" -> (Exp_number 11.)
+
+    ]]
+    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    } |}]
+
+let%expect_test "func_decl" =
+  eval
+    (Parser.parse_exn
+       {| function fact(n)
+  if n == 0 then return 1 else return n * fact(n - 1) end
+end |} ) ;
+  [%expect
+    {|
+    { vars =
+      [["fact" ->
+         (Exp_function (["n"],
+            [(Stat_if (
+                [((Exp_op (Op_eq, (Exp_lhs "n"), (Exp_number 0.))),
+                  [(Stat_return [(Exp_number 1.)])])],
+                (Some [(Stat_return
+                          [(Exp_op (Op_mul, (Exp_lhs "n"),
+                              (Exp_call
+                                 (Call ((Exp_lhs "fact"),
+                                    [(Exp_op (Op_sub, (Exp_lhs "n"),
+                                        (Exp_number 1.)))
+                                      ]
+                                    )))
+                              ))
+                            ])
+                        ])
+                ))
+              ]
+            ))
+
+    ]]
+    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    } |}]
 
 let%expect_test "woeworwo" =
   eval (Parser.parse_exn "x = 15 while x > 10 do x = x - 4 end") ;
