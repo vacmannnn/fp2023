@@ -1,5 +1,17 @@
 open Ast
-open Hashtbl_p
+
+module Hashtbl_p = struct
+  type ('k, 's) t = ('k, 's) Hashtbl.t
+
+  let pp pp_key pp_value ppf values =
+    Format.fprintf ppf "[["
+    |> fun () ->
+    Hashtbl.iter
+      (fun key data ->
+        Format.fprintf ppf "@[<1>%a@ ->@ %a@]@\n@." pp_key key pp_value data )
+      values
+    |> fun () -> Format.fprintf ppf "]]@\n"
+end
 
 module type MONAD = sig
   type 'a t
@@ -32,6 +44,21 @@ end
 module Eval (M : MONADERROR) = struct
   open M
 
+  type variables = (ident, expression) Hashtbl_p.t
+  [@@deriving show {with_path= false}]
+
+  type jump_statement = Default | Return | Break
+  [@@deriving show {with_path= false}]
+
+  type environment =
+    { vars: variables
+    ; last_value: expression
+    ; is_loop: bool
+    ; jump_stmt: jump_statement }
+  [@@deriving show {with_path= false}]
+
+  type env_lst = environment list
+  
   let arg_to_num arg1 arg2 msg =
     let is_num x =
       try
@@ -48,12 +75,6 @@ module Eval (M : MONADERROR) = struct
         return (float_of_string arg1, arg2)
     | _ ->
         error msg
-
-  let ( /// ) x y = Float.floor (x /. y)
-
-  let ( %% ) x y =
-    let int_part = x /// y in
-    x -. (int_part *. y)
 
   let compare lhs rhs op =
     let get_op = function
@@ -93,22 +114,6 @@ module Eval (M : MONADERROR) = struct
   let is_true = function Exp_true -> true | _ -> false
 
   let is_global = function Nonlocal -> true | _ -> false
-
-  type variables = (ident, expression) Hashtbl_p.t
-  [@@deriving show {with_path= false}]
-
-  type jump_statement = Default | Return | Break
-  [@@deriving show {with_path= false}]
-
-  type environment =
-    { vars: variables
-    ; last_value: expression
-    ; is_func: bool
-    ; is_loop: bool
-    ; jump_stmt: jump_statement }
-  [@@deriving show {with_path= false}]
-
-  type env_lst = environment list
 
   let rec find_var varname = function
     | [] ->
@@ -150,6 +155,9 @@ module Eval (M : MONADERROR) = struct
               | Op_div ->
                   (( /. ), "Error: Unsupported operands type for (/)")
               | Op_mod ->
+                let ( %% ) x y =
+                  let int_part = x /. y in
+                  x -. (int_part *. y) in 
                   (( %% ), "Error: Unsupported operands type for (%)")
               | _ ->
                   (( +. ), "Unreachable")
@@ -174,13 +182,6 @@ module Eval (M : MONADERROR) = struct
            absent!"
     | hd :: tl ->
         return @@ ({hd with last_value} :: tl)
-
-  and set_hd_vars vars = function
-    | [] ->
-        error
-          "Error: Can't modify environment head with <vars>. Head is absent!"
-    | hd :: tl ->
-        return @@ ({hd with vars} :: tl)
 
   and modify_hd_vars value = function
     | [] ->
@@ -226,44 +227,8 @@ module Eval (M : MONADERROR) = struct
                 else evalif env_lst tail tl )
         in
         evalif env_lst tail body
-    (* | Stat_call app ->
-        let ev_exp args = List.map (eval_expr env_lst) args in
-        let call env_lst = function
-          | Call (name, args) ->
-              eval_expr env_lst name >>= fun n -> eval_call env_lst n args
-        in
-        call env_lst app *)
     | _ ->
         error "sad:("
-
-  (* and eval_call env_lst = function
-     | *)
-  (* and eval_call env_lst name fargs =
-     match name with
-     | Exp_lhs a -> (
-         find_var a env_lst
-         >>= function
-         | Exp_function (name, bd) ->
-             let var_args = List.map (fun x -> Exp_lhs x) name in
-             let abc = var_zipper var_args fargs in
-             let block_with_vardec b =
-               return @@ [Stat_assign (Local, "abc", Exp_number 0.1) :: b]
-             in
-             block_with_vardec bd
-             >>= fun b ->
-             set_hd_is_func ~is_func:true env_lst
-             >>= fun env_lst -> eval_block env_lst bd
-         | _ ->
-             error "I dont know this name" )
-     | _ ->
-         error "uncallable type" *)
-
-  and set_hd_is_func ?(is_func = true) = function
-    | [] ->
-        error
-          "Error: Can't modify environment head with <is_func>. Head is absent!"
-    | hd :: tl ->
-        return @@ ({hd with is_func} :: tl)
 
   and eval_while e bal env_lst =
     eval_expr env_lst e
@@ -320,7 +285,6 @@ module Eval (M : MONADERROR) = struct
     | [] ->
         [ { vars= Hashtbl.create 16
           ; last_value= Exp_nil
-          ; is_func= false
           ; is_loop= false
           ; jump_stmt= Default } ]
     | hd_env :: tl ->
@@ -349,8 +313,6 @@ module Eval (M : MONADERROR) = struct
         get_cur_env env_lst
         >>= fun cur_env ->
         match tl with
-        (* | Stat_return v when cur_env.is_func ->
-            eval_return env_lst v *)
         | Stat_break when cur_env.is_loop ->
             eval_break env_lst
         | Stat_break ->
@@ -430,7 +392,7 @@ let%expect_test "fact_interpreter" =
     "i" -> (Exp_number 11.)
 
     ]]
-    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
 let%expect_test "func_decl" =
@@ -463,7 +425,7 @@ end |} ) ;
             ))
 
     ]]
-    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
 let%expect_test "woeworwo" =
@@ -473,7 +435,7 @@ let%expect_test "woeworwo" =
     { vars = [["x" -> (Exp_number 7.)
 
     ]]
-    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
 let%expect_test "how" =
@@ -488,7 +450,7 @@ let%expect_test "how" =
     { vars = [["x" -> (Exp_number 10.)
 
     ]]
-    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
 let%expect_test "help" =
@@ -504,7 +466,7 @@ let%expect_test "help" =
       { vars = [["x" -> (Exp_number 7.)
 
       ]]
-      ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+      ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
       } |}]
 
 let%expect_test "abc" =
@@ -514,7 +476,7 @@ let%expect_test "abc" =
     { vars = [["x" -> (Exp_number 42.)
 
     ]]
-    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
 let%expect_test "abc" =
@@ -524,7 +486,7 @@ let%expect_test "abc" =
     { vars = [["x" -> (Exp_string "whennnnnn")
 
     ]]
-    ; last_value = Exp_nil; is_func = false; is_loop = false; jump_stmt = Default
+    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
 let%expect_test "abc" =
@@ -532,5 +494,4 @@ let%expect_test "abc" =
   [%expect
     {|
     { vars = [[]]
-      ; last_value = Exp_nil; is_func = false; is_loop = false;
-      jump_stmt = Default } |}]
+      ; last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
