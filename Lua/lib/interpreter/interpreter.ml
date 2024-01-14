@@ -371,14 +371,14 @@ let eval parsed_prog =
 
 let%expect_test "fact_interpreter" =
   eval
-  @@ Parser.parse_exn
+    (Parser.parse_exn
        {| k = 10 
        i = 1 
        n = 1 
        while i <= k do 
         n = n * i 
         i = i + 1 
-      end |} ;
+      end |} ) ;
   [%expect
     {|
     { vars = [["k" -> (Exp_number 10.)
@@ -424,7 +424,7 @@ end |} ) ;
     ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
-let%expect_test "woeworwo" =
+let%expect_test "while" =
   eval (Parser.parse_exn "x = 15 while x > 10 do x = x - 4 end") ;
   [%expect
     {|
@@ -434,13 +434,8 @@ let%expect_test "woeworwo" =
     ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
-let%expect_test "how" =
-  eval
-    [ Stat_assign (Nonlocal, "x", Exp_number 100.)
-    ; Stat_if
-        ( [ ( Exp_op (Op_eq, Exp_lhs "x", Exp_number 100.)
-            , [Stat_assign (Nonlocal, "x", Exp_number 10.)] ) ]
-        , None ) ] ;
+let%expect_test "if" =
+  eval (Parser.parse_exn "x = 100 if x == 100 then x = 10 end") ;
   [%expect
     {|
     { vars = [["x" -> (Exp_number 10.)
@@ -465,8 +460,8 @@ let%expect_test "help" =
       ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
       } |}]
 
-let%expect_test "abc" =
-  eval [Stat_assign (Nonlocal, "x", Exp_number 42.)] ;
+let%expect_test "assign" =
+  eval (Parser.parse_exn "x = 42") ;
   [%expect
     {|
     { vars = [["x" -> (Exp_number 42.)
@@ -475,7 +470,7 @@ let%expect_test "abc" =
     ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
-let%expect_test "abc" =
+let%expect_test "string_assign" =
   eval [Stat_assign (Nonlocal, "x", Exp_string "whennnnnn")] ;
   [%expect
     {|
@@ -485,8 +480,8 @@ let%expect_test "abc" =
     ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
 
-let%expect_test "abc" =
-  eval [Stat_while (Exp_false, [Stat_assign (Nonlocal, "x", Exp_number 1.)])] ;
+let%expect_test "while2" =
+  eval (Parser.parse_exn "while false do x = 1 end") ;
   [%expect
     {|
     { vars = [[]]
