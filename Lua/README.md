@@ -6,11 +6,9 @@ License: LGPL for implementation code + WTFPL for test examles in Lua
 
 Author: Aleksandr Lekomtsev, alelekomtsev@gmail.com
 
-Features done (append only):
+Features done:
 
-- Parser of statements and expressions
-
-Features in progress (and TODOs):
-
-- Interpreter of while, assign statements and compare/arithmetic operations
-- More tests on parser and interpreter
+- Parser of mini-Lua
+  - basic statements and expressions
+- Interpreter
+  - while, if, functions declaring, expressions
