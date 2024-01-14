@@ -45,7 +45,7 @@ and op_id =
   | Op_mod  (** E1 % E2 *)
   | Op_concat  (** E1 .. E2 *)
   | Op_eq  (** E1 == E2 *)
-  | Op_neq (** E1 <> E2 *)
+  | Op_neq (** E1 ~= E2 *)
   | Op_lt  (** E1 < E2 *)
   | Op_le  (** E1 <= E2 *)
   | Op_and  (** E1 and E2 *)

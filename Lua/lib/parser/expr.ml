@@ -59,6 +59,8 @@ let pcon = string ".." *> return (fun x y -> Exp_op (Op_concat, x, y))
 
 let peq = string "==" *> return (fun x y -> Exp_op (Op_eq, x, y))
 
+let pneq = string "~=" *> return (fun x y -> Exp_op (Op_neq, x, y))
+
 let plt = string "<" *> return (fun x y -> Exp_op (Op_lt, x, y))
 
 let pgt = string ">" *> return (fun x y -> Exp_op (Op_lt, y, x))
@@ -79,6 +81,7 @@ let parse_expr pblock =
       let pep = chainl1 pep (ws *> (padd <|> psub)) in
       let pep =
         chainl1 pep
-          (ws *> (peq <|> ple <|> plt <|> pge <|> pgt <|> pand <|> por))
+          (ws *> (peq <|> ple <|> plt <|> pge <|> pgt <|> pand <|> por <|> pneq))
       in
       pep )
+      
