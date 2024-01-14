@@ -24,7 +24,7 @@ let chainl1 e op =
   let rec go acc = lift2 (fun f x -> f acc x) op e >>= go <|> return acc in
   e >>= fun init -> go init
 
-(* ======= LHS ======= *)
+(* ======= Ident ======= *)
 
 let is_keyword = function
   | "and"
@@ -67,11 +67,3 @@ let parse_ident =
   in
   let* ident = lift2 String.( ^ ) parse_first parse_rest in
   if is_keyword ident then fail "ident can't be a keyword" else return ident
-
-let parse_lhs = parse_ident >>| fun id -> Lhs_ident id
-
-(* ======= Tests ======= *)
-
-let%expect_test "parse_lhs1" =
-  pp pp_lhs parse_lhs "_a0b1" ;
-  [%expect {| (Lhs_ident "_a0b1") |}]
