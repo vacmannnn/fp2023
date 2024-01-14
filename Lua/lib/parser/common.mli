@@ -8,7 +8,7 @@ open Ast
 
 (** Run parser on string and pretty print the output using printer.
     Used for inline expect tests *)
-val pp : (Format.formatter -> 'a -> unit) -> 'a t -> string -> unit
+val pp : (Stdlib.Format.formatter -> 'a -> unit) -> 'a t -> string -> unit
 
 (** skip whitespaces *)
 val ws : unit t
