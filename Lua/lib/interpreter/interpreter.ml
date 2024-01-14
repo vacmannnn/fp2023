@@ -1,3 +1,7 @@
+(** Copyright 2023-2024, Alexandr Lekomtsev *)
+
+(** SPDX-License-Identifier: LGPL-3.0-or-later *)
+
 open Ast
 
 module Hashtbl_p = struct
@@ -44,21 +48,6 @@ end
 module Eval (M : MONADERROR) = struct
   open M
 
-  type variables = (ident, expression) Hashtbl_p.t
-  [@@deriving show {with_path= false}]
-
-  type jump_statement = Default | Return | Break
-  [@@deriving show {with_path= false}]
-
-  type environment =
-    { vars: variables
-    ; last_value: expression
-    ; is_loop: bool
-    ; jump_stmt: jump_statement }
-  [@@deriving show {with_path= false}]
-
-  type env_lst = environment list
-  
   let arg_to_num arg1 arg2 msg =
     let is_num x =
       try
@@ -115,6 +104,30 @@ module Eval (M : MONADERROR) = struct
 
   let is_global = function Nonlocal -> true | _ -> false
 
+  type variables = (ident, expression) Hashtbl_p.t
+  [@@deriving show {with_path= false}]
+
+  type jump_statement = Default | Return | Break
+  [@@deriving show {with_path= false}]
+
+  type environment =
+    { vars: variables
+    ; last_value: expression
+    ; is_loop: bool
+    ; jump_stmt: jump_statement }
+  [@@deriving show {with_path= false}]
+
+  type env_lst = environment list
+
+  let create_next_env = function
+    | [] ->
+        [ { vars= Hashtbl.create 42
+          ; last_value= Exp_nil
+          ; is_loop= false
+          ; jump_stmt= Default } ]
+    | hd_env :: tl ->
+        {hd_env with vars= Hashtbl.create 42} :: hd_env :: tl
+
   let rec find_var varname = function
     | [] ->
         return Exp_nil
@@ -125,9 +138,51 @@ module Eval (M : MONADERROR) = struct
       | None ->
           find_var varname tl )
 
+  and set_hd_last_value last_value = function
+    | [] ->
+        error "Error: Can't set last_value. Head is absent!"
+    | hd :: tl ->
+        return ({hd with last_value} :: tl)
+
+  and modify_hd_vars value = function
+    | [] ->
+        error "Error: Can't modify environment head variables. Head is absent!"
+    | hd :: _ -> (
+      match value with name, vle -> return (Hashtbl.replace hd.vars name vle) )
+
+  and get_cur_env = function
+    | [] ->
+        error "Error: Current environment is absent!"
+    | hd :: _ ->
+        return hd
+
+  and set_parents_is_loop env_lst =
+    let prev_env = get_prev_env env_lst in
+    let prev_is_loop =
+      match prev_env with [] -> false | _ -> (List.hd prev_env).is_loop
+    in
+    update_loop prev_is_loop env_lst
+
+  and update_loop is_loop = function
+    | [] ->
+        error
+          "Error: Can't modify environment head with <is_loop>. Head is absent!"
+    | hd :: tl ->
+        return ({hd with is_loop} :: tl)
+
+  and update_jump jump_stmt = function
+    | [] ->
+        error
+          "Error: Can't modify environment head with <jump_stmt>. Head is \
+           absent!"
+    | hd :: tl ->
+        return ({hd with jump_stmt} :: tl)
+
+  and get_prev_env = function [] -> [] | _ :: tl -> tl
+
   let rec eval_expr env_lst = function
     | Exp_number v ->
-        return @@ Exp_number v
+        return (Exp_number v)
     | Exp_false ->
         return Exp_false
     | Exp_true ->
@@ -142,7 +197,7 @@ module Eval (M : MONADERROR) = struct
         eval_expr env_lst rhs
         >>= fun r ->
         match op with
-        | Op_le | Op_lt | Op_eq ->
+        | Op_le | Op_lt | Op_eq | Op_neq ->
             compare l r op
         | Op_add | Op_mul | Op_sub | Op_div -> (
             let get_op = function
@@ -155,9 +210,10 @@ module Eval (M : MONADERROR) = struct
               | Op_div ->
                   (( /. ), "Error: Unsupported operands type for (/)")
               | Op_mod ->
-                let ( %% ) x y =
-                  let int_part = x /. y in
-                  x -. (int_part *. y) in 
+                  let ( %% ) x y =
+                    let int_part = x /. y in
+                    x -. (int_part *. y)
+                  in
                   (( %% ), "Error: Unsupported operands type for (%)")
               | _ ->
                   (( +. ), "Unreachable")
@@ -175,26 +231,6 @@ module Eval (M : MONADERROR) = struct
     | _ ->
         error "Error: Unexpected expression"
 
-  and set_hd_last_value last_value = function
-    | [] ->
-        error
-          "Error: Can't modify environment head with <last_value>. Head is \
-           absent!"
-    | hd :: tl ->
-        return @@ ({hd with last_value} :: tl)
-
-  and modify_hd_vars value = function
-    | [] ->
-        error "Error: Can't modify environment head variables. Head is absent!"
-    | hd :: _ -> (
-      match value with name, vle -> return @@ Hashtbl.replace hd.vars name vle )
-
-  and get_cur_env = function
-    | [] ->
-        error "Error: Current environment is absent!"
-    | hd :: _ ->
-        return hd
-
   and eval_stmt env_lst = function
     | Stat_assign (loc, lhs, exp) ->
         eval_vardec loc env_lst (lhs, exp)
@@ -202,8 +238,8 @@ module Eval (M : MONADERROR) = struct
         error "Error: Unexpected return statement"
     | Stat_break ->
         error "Error: Unexpected break statement"
-    | Stat_while (e, bal) ->
-        set_hd_is_loop env_lst >>= fun env_lst -> eval_while e bal env_lst
+    | Stat_while (e, bdy) ->
+        update_loop true env_lst >>= fun env_lst -> eval_while e bdy env_lst
     | Stat_if (body, tail) ->
         let rec evalif env_lst tail = function
           | [] -> (
@@ -228,67 +264,10 @@ module Eval (M : MONADERROR) = struct
         in
         evalif env_lst tail body
     | _ ->
-        error "sad:("
-
-  and eval_while e bal env_lst =
-    eval_expr env_lst e
-    >>= fun predicate ->
-    if is_true predicate then
-      eval_block env_lst bal
-      >>= fun env_lst ->
-      get_cur_env env_lst
-      >>= fun cur_env ->
-      match cur_env.jump_stmt with
-      | Break ->
-          set_hd_jump_stmt Default env_lst
-      | Return ->
-          set_hd_jump_stmt Return env_lst
-      | _ ->
-          eval_while e bal env_lst
-    else set_parents_is_loop env_lst
-
-  and set_parents_is_loop env_lst =
-    let prev_env = get_prev_env env_lst in
-    let prev_is_loop =
-      match prev_env with [] -> false | _ -> (List.hd prev_env).is_loop
-    in
-    set_hd_is_loop ~is_loop:prev_is_loop env_lst
-
-  and set_hd_is_loop ?(is_loop = true) = function
-    | [] ->
-        error
-          "Error: Can't modify environment head with <is_loop>. Head is absent!"
-    | hd :: tl ->
-        return @@ ({hd with is_loop} :: tl)
+        error "Not implemented statement"
 
   and eval_vardec local_flag env_lst (lhs, exp) =
     eval_expr env_lst exp >>= fun v -> assign lhs v local_flag env_lst
-
-  and eval_return env_lst e =
-    eval_expr env_lst e
-    >>= fun v ->
-    let prev_env = get_prev_env env_lst in
-    set_hd_last_value v prev_env
-    >>= fun prev_env -> set_hd_jump_stmt Return prev_env
-
-  and set_hd_jump_stmt jump_stmt = function
-    | [] ->
-        error
-          "Error: Can't modify environment head with <jump_stmt>. Head is \
-           absent!"
-    | hd :: tl ->
-        return @@ ({hd with jump_stmt} :: tl)
-
-  and get_prev_env = function [] -> [] | _ :: tl -> tl
-
-  and create_next_env = function
-    | [] ->
-        [ { vars= Hashtbl.create 16
-          ; last_value= Exp_nil
-          ; is_loop= false
-          ; jump_stmt= Default } ]
-    | hd_env :: tl ->
-        {hd_env with vars= Hashtbl.create 16} :: hd_env :: tl
 
   and assign n v loc env_lst =
     let rec set_global n v = function
@@ -306,9 +285,26 @@ module Eval (M : MONADERROR) = struct
     if is_global loc then (set_global n v env_lst ; return env_lst)
     else modify_hd_vars (n, v) env_lst >>= fun _ -> return env_lst
 
+  and eval_while e bdy env_lst =
+    eval_expr env_lst e
+    >>= fun predicate ->
+    if is_true predicate then
+      eval_block env_lst bdy
+      >>= fun env_lst ->
+      get_cur_env env_lst
+      >>= fun cur_env ->
+      match cur_env.jump_stmt with
+      | Break ->
+          update_jump Default env_lst
+      | Return ->
+          update_jump Return env_lst
+      | _ ->
+          eval_while e bdy env_lst
+    else set_parents_is_loop env_lst
+
   and eval_block env_lst = function
     | [] ->
-        return @@ get_prev_env env_lst
+        return (get_prev_env env_lst)
     | [tl] -> (
         get_cur_env env_lst
         >>= fun cur_env ->
@@ -328,7 +324,7 @@ module Eval (M : MONADERROR) = struct
             | Return ->
                 let prev_env = get_prev_env env_lst in
                 set_hd_last_value cur_env.last_value prev_env
-                >>= fun prev_env -> set_hd_jump_stmt Return prev_env
+                >>= fun prev_env -> update_jump Return prev_env
             | Break ->
                 eval_break env_lst
             | _ -> (
@@ -347,7 +343,7 @@ module Eval (M : MONADERROR) = struct
         | Return ->
             let prev_env = get_prev_env env_lst in
             set_hd_last_value cur_env.last_value prev_env
-            >>= fun prev_env -> set_hd_jump_stmt Return prev_env
+            >>= fun prev_env -> update_jump Return prev_env
         | Break ->
             eval_break env_lst
         | _ ->
@@ -355,7 +351,7 @@ module Eval (M : MONADERROR) = struct
 
   and eval_break env_lst =
     let prev_env = get_prev_env env_lst in
-    set_hd_jump_stmt Break prev_env >>= fun env -> set_parents_is_loop env
+    update_jump Break prev_env >>= fun env -> set_parents_is_loop env
 
   and eval_prog block = eval_block (create_next_env []) block
 end
@@ -367,7 +363,7 @@ let eval parsed_prog =
   | Ok res -> (
     match res with
     | hd :: _ ->
-        print_endline @@ show_environment hd
+        print_endline (show_environment hd)
     | [] ->
         print_endline "[]" )
   | Error msg ->
@@ -385,9 +381,9 @@ let%expect_test "fact_interpreter" =
       end |} ;
   [%expect
     {|
-    { vars = [["n" -> (Exp_number 3628800.)
+    { vars = [["k" -> (Exp_number 10.)
 
-    "k" -> (Exp_number 10.)
+    "n" -> (Exp_number 3628800.)
 
     "i" -> (Exp_number 11.)
 
