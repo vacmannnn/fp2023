@@ -13,6 +13,10 @@ let parse_false = string "false" *> return Exp_false
 
 let parse_nil = string "nil" *> return Exp_nil
 
+let parse_string =
+  string "\"" *> many_till any_char (string "\"")
+  >>= fun str -> return (Exp_string (Base.String.of_char_list str))
+
 let parse_number =
   take_while (function '0' .. '9' | '.' | '-' -> true | _ -> false)
   >>= fun s ->
@@ -47,6 +51,7 @@ let parse_single_expr pblock pexpr =
        ; parse_true
        ; parse_nil
        ; parse_number
+       ; parse_string
        ; parse_explhs ]
 
 let pmul = string "*" *> return (fun x y -> Exp_op (Op_mul, x, y))

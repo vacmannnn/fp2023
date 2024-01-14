@@ -277,3 +277,7 @@ let%expect_test "parse_expcall" =
           (Call ((Exp_lhs "fact"),
              [(Exp_op (Op_sub, (Exp_lhs "n"), (Exp_number 1.)))])))
        )) |}]
+
+let%expect_test "parse_expstr" =
+  pp pp_expression (parse_expr parse_block) {|"hello world"|};
+  [%expect {| (Exp_string "hello world") |}]
