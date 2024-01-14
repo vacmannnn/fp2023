@@ -1,7 +1,7 @@
 (library
  (name interpreter)
  (public_name Lua.Interpreter)
- (modules interpreter Hashtbl_p var_zipper)
+ (modules interpreter Hashtbl_p)
  (libraries base angstrom ast parser)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.ord))
