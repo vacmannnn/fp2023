@@ -76,7 +76,9 @@ let por = string "or" *> return (fun x y -> Exp_op (Op_or, x, y))
 let parse_expr pblock =
   fix (fun pexpr ->
       let pep =
-        chainl1 (parse_single_expr pblock pexpr) (ws *> (pcon <|> pmul <|> pdiv))
+        chainl1
+          (parse_single_expr pblock pexpr)
+          (ws *> (pcon <|> pmul <|> pdiv <|> pmod))
       in
       let pep = chainl1 pep (ws *> (padd <|> psub)) in
       let pep =
@@ -84,4 +86,3 @@ let parse_expr pblock =
           (ws *> (peq <|> ple <|> plt <|> pge <|> pgt <|> pand <|> por <|> pneq))
       in
       pep )
-      
