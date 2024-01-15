@@ -47,7 +47,7 @@ module Eval (M : MONADERROR) = struct
   let arg_to_num arg1 arg2 msg =
     let is_num x =
       try
-        float_of_string x |> ignore;
+        let (_ : float) = float_of_string x in
         true
       with
       | Failure _ -> false
@@ -139,8 +139,9 @@ module Eval (M : MONADERROR) = struct
   and modify_hd_vars value = function
     | [] -> error "Error: Can't modify environment head variables. Head is absent!"
     | hd :: _ ->
+      let update_var name vle = Hashtbl.replace hd.vars name vle in
       (match value with
-       | name, vle -> return (Hashtbl.replace hd.vars name vle))
+       | name, vle -> return (update_var name vle))
 
   and get_cur_env = function
     | [] -> error "Error: Current environment is absent!"
@@ -434,6 +435,11 @@ let%expect_test "bool_assign" =
     ]]
     ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
+;;
+
+let%expect_test "incorrect_assign" =
+  eval (Parser.parse_exn {| x = "abc" + 999 |});
+  [%expect {| Error: Unsupported operands type for (+) |}]
 ;;
 
 let%expect_test "string_assign" =

@@ -3,6 +3,6 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 open! Base
-open Ast
+open! Ast
 
 val eval : Ast.block -> unit
