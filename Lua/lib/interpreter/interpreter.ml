@@ -50,7 +50,7 @@ module Eval (M : MONADERROR) = struct
         let (_ : float) = float_of_string x in
         true
       with
-      | Failure _ -> false
+      | _ -> false
     in
     match arg1, arg2 with
     | Exp_number arg1, Exp_number arg2 -> return (arg1, arg2)
@@ -139,9 +139,8 @@ module Eval (M : MONADERROR) = struct
   and modify_hd_vars value = function
     | [] -> error "Error: Can't modify environment head variables. Head is absent!"
     | hd :: _ ->
-      let update_var name vle = Hashtbl.replace hd.vars name vle in
-      (match value with
-       | name, vle -> return (update_var name vle))
+      let update_var (name, vle) = return (Hashtbl.replace hd.vars name vle) in
+      update_var value
 
   and get_cur_env = function
     | [] -> error "Error: Current environment is absent!"
@@ -196,9 +195,10 @@ module Eval (M : MONADERROR) = struct
              ( %% ), "Error: Unsupported operands type for (%)"
            | _ -> ( +. ), "Unreachable"
          in
-         (match get_op op with
-          | op, err_msg ->
-            arg_to_num l r err_msg >>= fun (x, y) -> return (Exp_number (op x y)))
+         let calculate_or_msg (op, err_msg) =
+           arg_to_num l r err_msg >>= fun (x, y) -> return (Exp_number (op x y))
+         in
+         calculate_or_msg (get_op op)
        | _ -> return Exp_nil)
     | Exp_lhs l -> find_var l env_lst
     | Exp_function (ids, bl) -> return (Exp_function (ids, bl))
@@ -217,16 +217,18 @@ module Eval (M : MONADERROR) = struct
            | None -> return []
            | Some block -> eval_block env_lst block)
         | [ body ] ->
-          (match body with
-           | pred, st ->
-             eval_expr env_lst pred
-             >>= fun res -> if is_true res then eval_block env_lst st else return [])
+          let eval_block_if_true (pred, st) =
+            eval_expr env_lst pred
+            >>= fun res -> if is_true res then eval_block env_lst st else return []
+          in
+          eval_block_if_true body
         | bd :: tl ->
-          (match bd with
-           | pred, st ->
-             eval_expr env_lst pred
-             >>= fun res ->
-             if is_true res then eval_block env_lst st else evalif env_lst tail tl)
+          let eval_block_if_true (pred, st) =
+            eval_expr env_lst pred
+            >>= fun res ->
+            if is_true res then eval_block env_lst st else evalif env_lst tail tl
+          in
+          eval_block_if_true bd
       in
       evalif env_lst tail body
     | _ -> error "Not implemented statement"
