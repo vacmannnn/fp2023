@@ -425,13 +425,16 @@ let%expect_test "assign" =
     } |}]
 ;;
 
-let%expect_test "bool_assign" = eval (Parser.parse_exn {| x = "abc" ~= "cba" |});
-  [%expect {|
+let%expect_test "bool_assign" =
+  eval (Parser.parse_exn {| x = "abc" ~= "cba" |});
+  [%expect
+    {|
     { vars = [["x" -> Exp_true
 
     ]]
     ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
     } |}]
+;;
 
 let%expect_test "string_assign" =
   eval [ Stat_assign (Nonlocal, "x", Exp_string "whennnnnn") ];
