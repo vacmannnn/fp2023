@@ -46,11 +46,9 @@ module Eval (M : MONADERROR) = struct
 
   let arg_to_num arg1 arg2 msg =
     let is_num x =
-      try
-        let (_ : float) = float_of_string x in
-        true
-      with
-      | _ -> false
+      match float_of_string_opt x with
+      | None -> false
+      | Some _ -> true
     in
     match arg1, arg2 with
     | Exp_number arg1, Exp_number arg2 -> return (arg1, arg2)
