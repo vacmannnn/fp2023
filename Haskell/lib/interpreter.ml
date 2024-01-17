@@ -177,8 +177,8 @@ end = struct
     | ExprVar x ->
       (match find env x with
        | Some v ->
-         (match force v with
-          | Result (Ok (ValFun (p, e, _))) -> return @@ ValFun (p, e, update env x v)
+         (match v with
+          | Result (Ok (ValFun (p, e, env))) -> return @@ ValFun (p, e, update env x v)
           | _ -> v)
        | None -> fail @@ NotInScopeError x)
     | ExprLit lit ->
@@ -206,7 +206,7 @@ end = struct
               (return f_env)
               pat
               (* cringe but sometimes it is not in WHNF due to bad design
-                 so we have to make this abomination *)
+                 so we have to make this abominatin *)
               (thunk (fun () ->
                  let* arg = eval env arg in
                  return arg))
@@ -218,7 +218,7 @@ end = struct
       let hd_t = eval env hd in
       let tl_t = eval env tl in
       thunk (fun () -> return (ValList (hd_t, tl_t)))
-    | ExprFunc (pat, expr) -> thunk (fun () -> return (ValFun (pat, expr, env)))
+    | ExprFunc (pat, expr) -> return (ValFun (pat, expr, env))
     | ExprCase (expr, branches) ->
       thunk (fun () ->
         let e_val = eval env expr in
@@ -290,8 +290,8 @@ end = struct
          as a way to pattern match lIkE iN hAsKeLL 😈😈😈.
 
          Currently it overshadows previous definition.*)
-      let* env = env in
-      let env = update env x value in
+      let* env' = env in
+      let env = update env' x value in
       return env
     | PatCons (hd1, tl1) ->
       (match force value with
@@ -329,13 +329,6 @@ end = struct
   and eval_decl env (DeclLet (pat, e)) =
     let* env' = env in
     let val_e = eval env' e in
-    let* env' = match_pattern env pat val_e in
-    let val_e =
-      thunk (fun () ->
-        match force val_e with
-        | Result (Ok (ValFun (p, body, _))) -> return (ValFun (p, body, env'))
-        | _ -> val_e)
-    in
     match_pattern env pat val_e
   ;;
 
