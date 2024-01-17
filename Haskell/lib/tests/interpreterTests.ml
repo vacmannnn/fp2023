@@ -134,3 +134,14 @@ let%expect_test _ =
   [%expect {|
     Non-exhausitve patterns in tuple |}]
 ;;
+
+let%expect_test _ =
+  parse_interpret
+    {|
+numbers_starting_at n = n : numbers_starting_at (n + 1)  
+
+res = if True then [1] else numbers_starting_at 1|};
+  [%expect {|
+    numbers_starting_at => <fun>
+    res => [1] |}]
+;;
