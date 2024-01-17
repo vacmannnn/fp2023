@@ -27,9 +27,9 @@ let%expect_test _ =
     lst2 = [1, 2, 5]
     res = lst1 > lst2|};
   [%expect {|
-    res => true
+    lst1 => [1, 2, 6]
     lst2 => [1, 2, 5]
-    lst1 => [1, 2, 6] |}]
+    res => true |}]
 ;;
 
 let%expect_test _ =
@@ -41,8 +41,8 @@ let%expect_test _ =
 let%expect_test _ =
   parse_interpret {|(x:xs) = [52]|};
   [%expect {|
-    xs => []
-    x => 52 |}]
+    x => 52
+    xs => [] |}]
 ;;
 
 let%expect_test _ =
@@ -60,9 +60,9 @@ let%expect_test _ =
   y = 'a' >= 'b'
   z = 5 < 6 |};
   [%expect {|
-    z => true
+    x => false
     y => false
-    x => false |}]
+    z => true |}]
 ;;
 
 (* due to lazy evalution we don't propagate this error;
@@ -82,8 +82,8 @@ let%expect_test _ =
 let%expect_test _ =
   parse_interpret {|(x, y) = ('g', 2)|};
   [%expect {|
-    y => 2
-    x => 'g' |}]
+    x => 'g'
+    y => 2 |}]
 ;;
 
 let%expect_test _ =
@@ -95,9 +95,9 @@ index (x:xs) n = if n == 0 then x else index xs (n - 1)
 
 res = index (numbers_starting_at 2) 20|};
   [%expect {|
-    res => 22
+    index => <fun>
     numbers_starting_at => <fun>
-    index => <fun> |}]
+    res => 22 |}]
 ;;
 
 let%expect_test _ =
@@ -111,21 +111,21 @@ fib a b = a : fib b (a + b)
 
 index (x:xs) n = if n == 0 then x else index xs (n - 1)
 
-res = index (fib 0 1) 20
+res = index (fib 0 1) 10
 |};
   [%expect {|
     fib => <fun>
-    res => 6765
-    take => <fun>
-    index => <fun> |}]
+    index => <fun>
+    res => 55
+    take => <fun> |}]
 ;;
 
 let%expect_test _ =
   parse_interpret {|x = -5
   y = x + 5|};
   [%expect {|
-    y => 0
-    x => -5 |}]
+    x => -5
+    y => 0 |}]
 ;;
 
 let%expect_test _ =

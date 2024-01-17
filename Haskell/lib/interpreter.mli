@@ -1,4 +1,4 @@
-(** Copyright 2023-2024, Danil *)
+(** Copyright 2023-2024, Danil P*)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
@@ -27,7 +27,7 @@ module EnvTypes : sig
     | TypeMismatch
 
   type res = (value, err) LazyResult.t
-  and environment = (string, res) Hashtbl.t
+  and environment = (string, res, Base.String.comparator_witness) Base.Map.t
 
   and value =
     | ValInt of int
@@ -43,6 +43,8 @@ end
 module Env : sig
   include module type of EnvTypes
 
+  val find : ('a, 'b, 'c) Base.Map.t -> 'a -> 'b option
+  val update : ('a, 'b, 'c) Base.Map.t -> 'a -> 'b -> ('a, 'b, 'c) Base.Map.t
   val pp_err : Format.formatter -> err -> unit
   val pp_value : Format.formatter -> value -> unit
   val pp_environment : Format.formatter -> environment -> unit
@@ -51,5 +53,5 @@ end
 
 module Eval : sig
   val interpret : Ast.prog -> unit
-  val eval_prog : Ast.prog -> ((string, Env.res) Hashtbl.t, Env.err) LazyResult.t
+  val eval_prog : Ast.prog -> (Env.environment, Env.err) LazyResult.t
 end

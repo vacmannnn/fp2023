@@ -29,10 +29,10 @@ end = struct
   let fail err = Result (Error err)
   let thunk t = Thunk t
 
-  let force mx =
+  let rec force mx =
     match mx with
     | Result _ -> mx
-    | Thunk thunk -> thunk ()
+    | Thunk thunk -> thunk () |> force
   ;;
 
   let rec ( >>= ) mx f =
@@ -55,7 +55,7 @@ module EnvTypes = struct
     | TypeMismatch
 
   type res = (value, err) LazyResult.t
-  and environment = (string, res) Hashtbl.t
+  and environment = (string, res, Base.String.comparator_witness) Base.Map.t
 
   and value =
     | ValInt of int
@@ -71,6 +71,9 @@ end
 module Env : sig
   include module type of EnvTypes
 
+  val empty : environment
+  val find : ('a, 'b, 'c) Base.Map.t -> 'a -> 'b option
+  val update : ('a, 'b, 'c) Base.Map.t -> 'a -> 'b -> ('a, 'b, 'c) Base.Map.t
   val pp_err : formatter -> err -> unit
   val pp_value : formatter -> value -> unit
   val pp_environment : formatter -> environment -> unit
@@ -78,6 +81,10 @@ module Env : sig
 end = struct
   open LazyResult
   include EnvTypes
+
+  let empty = Base.Map.empty (module Base.String)
+  let find env key = Base.Map.find env key
+  let update env key data = Base.Map.update env key ~f:(fun _ -> data)
 
   let rec pp_value fmt = function
     | ValInt n -> fprintf fmt "%d" n
@@ -120,17 +127,39 @@ end = struct
     | Thunk t -> t () |> pp_value_t fmt
 
   and pp_environment fmt env =
-    Hashtbl.iter (fun key value -> fprintf fmt "%s => %a \n" key pp_value_t value) env
+    Base.Map.iteri
+      ~f:(fun ~key ~data:value -> fprintf fmt "%s => %a \n" key pp_value_t value)
+      env
   ;;
 end
 
 module Eval : sig
   val interpret : prog -> unit
-  val eval_prog : prog -> ((string, Env.res) Hashtbl.t, Env.err) LazyResult.t
+  val eval_prog : prog -> (Env.environment, Env.err) LazyResult.t
 end = struct
   open LazyResult
   open LazyResult.Syntax
   open Env
+
+  (* since we don't have 'rec' flag, we have to traverse AST *)
+  let rec is_recursive pat = function
+    | ExprVar v -> v = pat
+    | ExprLit _ -> false
+    | ExprFunc (_, expr) -> is_recursive pat expr
+    | ExprApp (e1, e2) -> is_recursive pat e1 || is_recursive pat e2
+    | ExprIf (cond, e1, e2) ->
+      is_recursive pat cond || is_recursive pat e1 || is_recursive pat e2
+    | ExprTuple exprs -> List.exists (is_recursive pat) exprs
+    | ExprCons (hd, tl) -> is_recursive pat hd || is_recursive pat tl
+    | ExprNil -> false
+    | ExprCase (e, alts) ->
+      is_recursive pat e || List.exists (fun (_, expr) -> is_recursive pat expr) alts
+    | ExprBinOp (_, e1, e2) -> is_recursive pat e1 || is_recursive pat e2
+    | ExprUnOp (_, e) -> is_recursive pat e
+    | ExprLet (bindings, e) ->
+      List.exists (fun (_, binding_expr) -> is_recursive pat binding_expr) bindings
+      || is_recursive pat e
+  ;;
 
   let rec eval env expr =
     match expr with
@@ -146,8 +175,11 @@ end = struct
         let* e2' = eval env e2 in
         force_binop e1' e2' op)
     | ExprVar x ->
-      (match Hashtbl.find_opt env x with
-       | Some v -> v
+      (match find env x with
+       | Some v ->
+         (match force v with
+          | Result (Ok (ValFun (p, e, _))) -> return @@ ValFun (p, e, update env x v)
+          | _ -> v)
        | None -> fail @@ NotInScopeError x)
     | ExprLit lit ->
       (match lit with
@@ -169,10 +201,9 @@ end = struct
         let* f_val = eval env f in
         match f_val with
         | ValFun (pat, body, f_env) ->
-          let local_env = return (Hashtbl.copy f_env) in
           let* local_env =
             match_pattern
-              local_env
+              (return f_env)
               pat
               (* cringe but sometimes it is not in WHNF due to bad design
                  so we have to make this abomination *)
@@ -187,8 +218,7 @@ end = struct
       let hd_t = eval env hd in
       let tl_t = eval env tl in
       thunk (fun () -> return (ValList (hd_t, tl_t)))
-    | ExprFunc (pat, expr) ->
-      thunk (fun () -> return (ValFun (pat, expr, Hashtbl.copy env)))
+    | ExprFunc (pat, expr) -> thunk (fun () -> return (ValFun (pat, expr, env)))
     | ExprCase (expr, branches) ->
       thunk (fun () ->
         let e_val = eval env expr in
@@ -256,18 +286,13 @@ end = struct
   and match_pattern env pat value =
     match pat with
     | PatVar x ->
-      let* env = env in
-      (match Hashtbl.find_opt env x with
-       | Some _ ->
-         (* TODO: would be a good idea to allow multiple definitons
-            as a way to pattern match lIkE iN hAsKeLL 😈😈😈.
+      (* TODO: would be a good idea to allow multiple definitons
+         as a way to pattern match lIkE iN hAsKeLL 😈😈😈.
 
-            Currently it overshadows previous definition.*)
-         Hashtbl.replace env x value;
-         return env
-       | None ->
-         Hashtbl.add env x value;
-         return env)
+         Currently it overshadows previous definition.*)
+      let* env = env in
+      let env = update env x value in
+      return env
     | PatCons (hd1, tl1) ->
       (match force value with
        | Result (Ok (ValList (hd2, tl2))) ->
@@ -304,13 +329,22 @@ end = struct
   and eval_decl env (DeclLet (pat, e)) =
     let* env' = env in
     let val_e = eval env' e in
+    let* env' = match_pattern env pat val_e in
+    let val_e =
+      thunk (fun () ->
+        match force val_e with
+        | Result (Ok (ValFun (p, body, _))) -> return (ValFun (p, body, env'))
+        | _ -> val_e)
+    in
     match_pattern env pat val_e
   ;;
 
-  let eval_prog p = List.fold_left eval_decl (return (Hashtbl.create 69)) p
+  let eval_prog p = List.fold_left eval_decl (return empty) p
 
-  and pp_environment fmt env =
-    Hashtbl.iter (fun key value -> fprintf fmt "%s => %a \n" key pp_value_t value) env
+  let pp_environment fmt env =
+    Base.Map.iteri
+      ~f:(fun ~key ~data:value -> fprintf fmt "%s => %a \n" key pp_value_t value)
+      env
   ;;
 
   let interpret p =

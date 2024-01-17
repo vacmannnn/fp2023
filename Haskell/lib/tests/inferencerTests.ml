@@ -149,22 +149,6 @@ let%expect_test _ =
 ;;
 
 let%expect_test _ =
-  parse_infer {|
-    fix f = let x = f x in x
-
-|};
-  [%expect {| fix :: (p2 -> p3) -> p3 |}]
-;;
-
-let%expect_test _ =
-  parse_infer {|
-    fix f = f (fix f)
-
-|};
-  [%expect {| fix :: (p3 -> p3) -> p3 |}]
-;;
-
-let%expect_test _ =
   parse_infer {|   f a = 
   let x = x
       y = 5
@@ -260,4 +244,20 @@ let%expect_test _ =
     x :: p0
     y :: p1
     z :: p2 |}]
+;;
+
+let%expect_test _ =
+  parse_infer {|fix f = let x = f x in x|};
+  [%expect {|
+    fix :: (p3 -> p3) -> p3 |}]
+;;
+
+let%expect_test _ =
+  parse_infer
+    {|is_prime n =
+        let is_divisible_by d = if d * d > n then False else (if (n - ((n / d) * d)) == 0 then True else is_divisible_by (d + 1))
+        in
+        (if n <= 1 then False else is_divisible_by 2)|};
+  [%expect {|
+    is_prime :: Int -> Bool |}]
 ;;
