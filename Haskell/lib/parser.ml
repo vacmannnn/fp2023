@@ -41,7 +41,9 @@ let is_keyword = function
   | "where"
   | "data"
   | "True"
-  | "False" -> true
+  | "False"
+  | "Nil"
+  | "Node" -> true
   | _ -> false
 ;;
 
@@ -82,6 +84,7 @@ let expr_nil _ = ExprNil
 let expr_let dl e = ExprLet (dl, e)
 let expr_if e1 e2 e3 = ExprIf (e1, e2, e3)
 let expr_case e l = ExprCase (e, l)
+let expr_tree t = ExprTree t
 let pat_var pat = PatVar pat
 let pat_lit lit = PatLit lit
 let pat_wild _ = PatWild
@@ -91,6 +94,7 @@ let pat_list l = List.fold_right (fun e1 e2 -> PatCons (e1, e2)) l PatNil
 let pat_tuple l = PatTuple l
 let dec_let pat expr = DeclLet (pat, expr)
 let bind p e = p, e
+let node e n1 n2 = Node (e, n1, n2)
 
 let pname =
   pwspaces
@@ -235,11 +239,22 @@ let pexpr =
     [ pcase; plocbind; pif; pebinop; plambda ]
 ;;
 
+let ptree =
+  let helper =
+    fix
+    @@ fun ptree ->
+    let pnil = pstoken "Nil" *> return Nil in
+    let pnode = pparens @@ (pstoken "Node" *> lift3 node pexpr ptree ptree) in
+    pnil <|> pnode
+  in
+  lift expr_tree helper
+;;
+
 let pdecl =
   lift2
     dec_let
     (ptoken_eol ppat)
-    (lift2 expr_fun (many ppat) (pstoken "=" *> ptoken_eol pexpr))
+    (lift2 expr_fun (many ppat) (pstoken "=" *> ptoken_eol (pexpr <|> ptree)))
   <* pwspaces
 ;;
 
