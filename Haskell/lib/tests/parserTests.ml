@@ -402,3 +402,28 @@ let%expect_test _ =
                       ))
                    )))))))) |}]
 ;;
+
+let%expect_test _ =
+  ptest pdecl pp_decl {|x = (Node 1  Leaf Leaf)|};
+  [%expect
+    {|
+    (DeclLet ((PatVar "x"), (ExprTree (Node ((ExprLit (LitInt 1)), Leaf, Leaf))))) |}]
+;;
+
+let%expect_test _ =
+  ptest pdecl pp_decl {|x = Leaf|};
+  [%expect {|
+    (DeclLet ((PatVar "x"), (ExprTree Leaf))) |}]
+;;
+
+let%expect_test _ =
+  ptest pdecl pp_decl {|f (Node x  (Node 1  Leaf Leaf) Leaf) = Leaf|};
+  [%expect
+    {|
+    (DeclLet
+       ((PatVar "f"),
+        (ExprFunc
+           ((PatTree ((PatVar "x"),
+               (PatTree ((PatLit (LitInt 1)), PatLeaf, PatLeaf)), PatLeaf)),
+            (ExprTree Leaf))))) |}]
+;;

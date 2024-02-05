@@ -92,6 +92,8 @@ let pat_nil _ = PatNil
 let pat_cons e1 e2 = PatCons (e1, e2)
 let pat_list l = List.fold_right (fun e1 e2 -> PatCons (e1, e2)) l PatNil
 let pat_tuple l = PatTuple l
+let pat_leaf _ = PatLeaf
+let pat_tree (v :: n1 :: n2 :: tl) = PatTree (v, n1, n2)
 let dec_let pat expr = DeclLet (pat, expr)
 let bind p e = p, e
 let node e n1 n2 = Node (e, n1, n2)
@@ -140,9 +142,14 @@ let ppat =
     | [ x ] -> x
     | elems -> pat_tuple elems
   in
+  let ptree =
+    let pnil = pat_leaf <$> pstoken "Leaf" in
+    let pnode = pparens @@ (pstoken "Node" *> (many pattern >>| pat_tree)) in
+    pnil <|> pnode
+  in
   choice
     ~failure_msg:"Parsing error: can't parse pattern"
-    [ ppnil; pptuple; pplit; ppvar; pwild; pplist; pcons ]
+    [ ppnil; pptuple; pplit; ppvar; pwild; pplist; pcons; ptree ]
 ;;
 
 (* Expressions *)
@@ -243,7 +250,7 @@ let ptree =
   let helper =
     fix
     @@ fun ptree ->
-    let pnil = pstoken "Nil" *> return Nil in
+    let pnil = pstoken "Leaf" *> return Leaf in
     let pnode = pparens @@ (pstoken "Node" *> lift3 node pexpr ptree ptree) in
     pnil <|> pnode
   in

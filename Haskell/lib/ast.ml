@@ -44,6 +44,7 @@ type pat =
   | PatTuple of pat list (* Tuple pattern [(x, y)] *)
   | PatCons of pat * pat (* List constructor pattern [x:xs] *)
   | PatNil (* Empty list pattern [[]] *)
+  | PatLeaf (* Leaf node of a tree *)
   | PatTree of pat * pat * pat (* Tree pattern *)
 [@@deriving show { with_path = false }]
 
@@ -76,7 +77,7 @@ and expr =
 
 (* Type representing a tree structure with arbitrary number of nodes *)
 and tree =
-  | Nil
+  | Leaf
   | Node of expr * tree * tree
 
 (* Type representing a single declaration. *)
