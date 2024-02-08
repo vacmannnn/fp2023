@@ -37,6 +37,12 @@ type ty =
   | TyTuple of ty list
   | TyTree of ty
 
+type error =
+  | OccursCheck
+  | NoVariable of string
+  | UnificationFailed of ty * ty
+
+val pp_error : Format.formatter -> error -> unit
 val pp_ty : Format.formatter -> ty -> unit
 val show_ty : ty -> string
 

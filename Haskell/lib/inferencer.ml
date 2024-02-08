@@ -10,24 +10,6 @@
 open Typedtree
 open Ast
 
-type error =
-  | OccursCheck
-  | NoVariable of string
-  | UnificationFailed of ty * ty
-
-let pp_error fmt = function
-  | OccursCheck -> Format.printf "Occurs check"
-  | NoVariable s -> Format.fprintf fmt "Variable not in scope: %s" s
-  | UnificationFailed (l, r) ->
-    Format.fprintf
-      fmt
-      "This expression has type (%a) but an expression was expected of type (%a)"
-      pp_type
-      l
-      pp_type
-      r
-;;
-
 module R : sig
   type 'a t
 

@@ -24,7 +24,7 @@ let run s =
         | Result (Ok res') -> pp_combined_output res res'
         | Result (Error err) -> Format.printf "%a" Env.pp_err err
         | _ -> ())
-     | Error err -> Format.printf "%a" Inferencer.pp_error err)
+     | Error err -> Format.printf "%a" Typedtree.pp_error err)
   | Error err ->
     Format.printf "%s\n" err;
     exit 1

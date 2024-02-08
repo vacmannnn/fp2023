@@ -27,6 +27,11 @@ type ty =
 
 type scheme = S of binder_set * ty [@@deriving show { with_path = false }]
 
+type error =
+  | OccursCheck
+  | NoVariable of string
+  | UnificationFailed of ty * ty
+
 let pp_type fmt ty =
   let open Format in
   let rec helper fmt = function
@@ -50,4 +55,17 @@ let pp_type fmt ty =
     | TyTree t -> fprintf fmt "🌳 of %a" helper t
   in
   helper fmt ty
+;;
+
+let pp_error fmt = function
+  | OccursCheck -> Format.printf "Occurs check"
+  | NoVariable s -> Format.fprintf fmt "Variable not in scope: %s" s
+  | UnificationFailed (l, r) ->
+    Format.fprintf
+      fmt
+      "This expression has type (%a) but an expression was expected of type (%a)"
+      pp_type
+      l
+      pp_type
+      r
 ;;
