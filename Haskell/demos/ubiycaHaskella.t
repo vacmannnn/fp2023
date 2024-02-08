@@ -175,3 +175,58 @@ YET ANOTHER FACTORIAL
   mul :: Int -> Int -> Int => <fun>
   numbers_starting_at :: Int -> [Int] => <fun>
   scanl :: (p9 -> p12 -> p9) -> p9 -> [p12] -> [p9] => <fun>
+
+TREE MIN
+  $ ./ubiycaHaskella.exe <<EOF
+  > shared_node = (Node 3 (Node 2 Leaf Leaf) (Node 10 Leaf Leaf))
+  > tree = (Node 6 (Node 5 (Node 0 shared_node Leaf) (Node 7 Leaf Leaf)) shared_node)
+  >  
+  > min x y = if x <= y then x else y
+  > 
+  > int_max = 1000000
+  > 
+  > min_of_tree tree = case tree of
+  >   Leaf -> int_max
+  >   (Node v l r) -> min v (min (min_of_tree l) (min_of_tree r))
+  > 
+  > tree_of_min tree =
+  >   let replace_values value tree = case tree of 
+  >     Leaf -> Leaf
+  >     (Node v l r) -> Node value (replace_values value l) (replace_values value r)
+  >   in 
+  >   replace_values (min_of_tree tree) tree
+  > 
+  > res = tree_of_min tree
+  int_max :: Int => 1000000
+  min :: p12 -> p12 -> p12 => <fun>
+  min_of_tree :: 🌳 of Int -> Int => <fun>
+  res :: 🌳 of Int => 
+  0
+  ├── 0
+  │   ├── 0
+  │   │   └── 0
+  │   │       ├── 0
+  │   │       └── 0
+  │   └── 0
+  └── 0
+      ├── 0
+      └── 0
+  
+  shared_node :: 🌳 of Int => 
+  3
+  ├── 2
+  └── 10
+  
+  tree :: 🌳 of Int => 
+  6
+  ├── 5
+  │   ├── 0
+  │   │   └── 3
+  │   │       ├── 2
+  │   │       └── 10
+  │   └── 7
+  └── 3
+      ├── 2
+      └── 10
+  
+  tree_of_min :: 🌳 of Int -> 🌳 of Int => <fun>

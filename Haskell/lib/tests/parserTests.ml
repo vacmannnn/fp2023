@@ -407,7 +407,9 @@ let%expect_test _ =
   ptest pdecl pp_decl {|x = (Node 1  Leaf Leaf)|};
   [%expect
     {|
-    (DeclLet ((PatVar "x"), (ExprTree (Node ((ExprLit (LitInt 1)), Leaf, Leaf))))) |}]
+    (DeclLet
+       ((PatVar "x"),
+        (ExprTree (Node ((ExprLit (LitInt 1)), (ExprTree Leaf), (ExprTree Leaf)))))) |}]
 ;;
 
 let%expect_test _ =

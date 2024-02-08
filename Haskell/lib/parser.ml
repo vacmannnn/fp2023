@@ -42,7 +42,7 @@ let is_keyword = function
   | "data"
   | "True"
   | "False"
-  | "Nil"
+  | "Leaf"
   | "Node" -> true
   | _ -> false
 ;;
@@ -93,7 +93,7 @@ let pat_cons e1 e2 = PatCons (e1, e2)
 let pat_list l = List.fold_right (fun e1 e2 -> PatCons (e1, e2)) l PatNil
 let pat_tuple l = PatTuple l
 let pat_leaf _ = PatLeaf
-let pat_tree (v :: n1 :: n2 :: tl) = PatTree (v, n1, n2)
+let pat_tree v n1 n2 = PatTree (v, n1, n2)
 let dec_let pat expr = DeclLet (pat, expr)
 let bind p e = p, e
 let node e n1 n2 = Node (e, n1, n2)
@@ -144,7 +144,7 @@ let ppat =
   in
   let ptree =
     let pnil = pat_leaf <$> pstoken "Leaf" in
-    let pnode = pparens @@ (pstoken "Node" *> (many pattern >>| pat_tree)) in
+    let pnode = pparens @@ (pstoken "Node" *> lift3 pat_tree pattern pattern pattern) in
     pnil <|> pnode
   in
   choice
@@ -241,27 +241,27 @@ let pexpr =
     in
     lift2 expr_case (pstoken "case" *> pexpr <* pstoken "of") (many pbranch)
   in
-  choice
-    ~failure_msg:"Parsing error: can't parse expression"
-    [ pcase; plocbind; pif; pebinop; plambda ]
-;;
-
-let ptree =
-  let helper =
-    fix
-    @@ fun ptree ->
-    let pnil = pstoken "Leaf" *> return Leaf in
-    let pnode = pparens @@ (pstoken "Node" *> lift3 node pexpr ptree ptree) in
-    pnil <|> pnode
+  let ptree =
+    let pnil = pstoken_eol "Leaf" *> return Leaf in
+    let pnode =
+      let helper = pvalue <|> pexpr in
+      pstoken_eol "Node" *> lift3 node helper helper helper
+    in
+    expr_tree <$> (pnil <|> pnode)
   in
-  lift expr_tree helper
+  let c =
+    choice
+      ~failure_msg:"Parsing error: can't parse expression"
+      [ ptree; pcase; plocbind; pif; pebinop; plambda ]
+  in
+  c <|> pparens c
 ;;
 
 let pdecl =
   lift2
     dec_let
     (ptoken_eol ppat)
-    (lift2 expr_fun (many ppat) (pstoken "=" *> ptoken_eol (pexpr <|> ptree)))
+    (lift2 expr_fun (many ppat) (pstoken "=" *> ptoken_eol pexpr))
   <* pwspaces
 ;;
 

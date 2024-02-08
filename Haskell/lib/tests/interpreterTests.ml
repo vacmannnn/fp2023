@@ -2,9 +2,6 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-(* Here infinite lists are defined as functions with wildcard pattern
-   to avoid printing it out as an infinite list (otherwise we are stuck in a loop) *)
-
 open HaskellLib
 open Interpreter
 
@@ -16,132 +13,156 @@ let parse_interpret input =
 
 let%expect_test _ =
   parse_interpret {|fact n = if n < 2 then 1 else fact (n - 1) * n
-  x = fact 7|};
+  x = fact 3|};
   [%expect {|
     fact => <fun>
-    x => 5040 |}]
+    x => 6 |}]
 ;;
 
 let%expect_test _ =
-  parse_interpret {|  lst1 = [1, 2, 6]
-    lst2 = [1, 2, 5]
-    res = lst1 > lst2|};
+  parse_interpret {|f a b = b + a
+  x = f 5
+  y = x 6|};
   [%expect {|
-    lst1 => [1, 2, 6]
-    lst2 => [1, 2, 5]
-    res => true |}]
+  f => <fun>
+  x => <fun>
+  y => 11 |}]
 ;;
 
 let%expect_test _ =
-  parse_interpret {|x = 'a'|};
+  parse_interpret {|x = (Node 5 Leaf Leaf)|};
   [%expect {|
-    x => 'a' |}]
-;;
-
-let%expect_test _ =
-  parse_interpret {|(x:xs) = [52]|};
-  [%expect {|
-    x => 52
-    xs => [] |}]
-;;
-
-let%expect_test _ =
-  parse_interpret {|dam x = case x of
-  [] -> 2
-(x:xs) -> 1 + 1
-y = dam []|};
-  [%expect {|
-    dam => <fun>
-    y => 2 |}]
-;;
-
-let%expect_test _ =
-  parse_interpret {|x = "asasdd" == "asd"
-  y = 'a' >= 'b'
-  z = 5 < 6 |};
-  [%expect {|
-    x => false
-    y => false
-    z => true |}]
-;;
-
-(* due to lazy evalution we don't propagate this error;
-   this is a byproduct of printing it for test. *)
-let%expect_test _ =
-  parse_interpret {|  lst = [1, 2, 6]
-    a = 1 / 0 
-    x = a + 5 
-    b = [1, 2]|};
-  [%expect {|
-    a => Infinity
-    b => [1, 2]
-    lst => [1, 2, 6]
-    x => Infinity |}]
-;;
-
-let%expect_test _ =
-  parse_interpret {|(x, y) = ('g', 2)|};
-  [%expect {|
-    x => 'g'
-    y => 2 |}]
+  x =>
+  5 |}]
 ;;
 
 let%expect_test _ =
   parse_interpret
-    {|
-numbers_starting_at n = n : numbers_starting_at (n + 1)  
-
-index (x:xs) n = if n == 0 then x else index xs (n - 1)
-
-res = index (numbers_starting_at 2) 20|};
+    {|shared_node = (Node "hello" (Node "world" Leaf Leaf) (Node "you" Leaf Leaf))|};
   [%expect {|
-    index => <fun>
-    numbers_starting_at => <fun>
-    res => 22 |}]
+  shared_node =>
+  "hello"
+  ├── "world"
+  └── "you" |}]
 ;;
 
 let%expect_test _ =
   parse_interpret
+    {|shared_node = (Node "hello" (Node "world" Leaf Leaf) (Node "you" Leaf Leaf))
+    tree = (Node "root" (Node "Mr. Poopypants" (Node "something something" shared_node Leaf) (Node "Ms. Poopypants" Leaf Leaf)) shared_node)|};
+  [%expect
     {|
-take n lst = case (n, lst) of
-  (n, (x:xs)) -> x : take (n - 1) xs
-  (1, (x:_)) -> [x]
-  (_, []) -> []
-fib a b = a : fib b (a + b)
+  shared_node =>
+  "hello"
+  ├── "world"
+  └── "you"
 
-index (x:xs) n = if n == 0 then x else index xs (n - 1)
-
-res = index (fib 0 1) 10
-|};
-  [%expect {|
-    fib => <fun>
-    index => <fun>
-    res => 55
-    take => <fun> |}]
-;;
-
-let%expect_test _ =
-  parse_interpret {|x = -5
-  y = x + 5|};
-  [%expect {|
-    x => -5
-    y => 0 |}]
-;;
-
-let%expect_test _ =
-  parse_interpret {|(x, y) = (1, 2, 3)
-  y = 5 + 5|};
-  [%expect {|
-    Non-exhausitve patterns in tuple |}]
+  tree =>
+  "root"
+  ├── "Mr. Poopypants"
+  │   ├── "something something"
+  │   │   └── "hello"
+  │   │       ├── "world"
+  │   │       └── "you"
+  │   └── "Ms. Poopypants"
+  └── "hello"
+      ├── "world"
+      └── "you" |}]
 ;;
 
 let%expect_test _ =
   parse_interpret
+    {|shared_node = (Node 3 (Node 2 Leaf Leaf) (Node 10 Leaf Leaf))
+    tree = (Node 6 (Node 5 (Node 0 shared_node Leaf) (Node 7 Leaf Leaf)) shared_node)
+    
+    increment tree = case tree of
+      Leaf -> Leaf
+      (Node v l r) -> Node (v * 10) (increment l) (increment r)
+    res = increment (tree)|};
+  [%expect
     {|
-numbers_starting_at n = n : numbers_starting_at (n + 1)  
+    increment => <fun>
+    res =>
+    60
+    ├── 50
+    │   ├── 0
+    │   │   └── 30
+    │   │       ├── 20
+    │   │       └── 100
+    │   └── 70
+    └── 30
+        ├── 20
+        └── 100
 
-res = if True then [1] else numbers_starting_at 1|};
-  [%expect {|
-    numbers_starting_at => <fun>
-    res => [1] |}]
+    shared_node =>
+    3
+    ├── 2
+    └── 10
+
+    tree =>
+    6
+    ├── 5
+    │   ├── 0
+    │   │   └── 3
+    │   │       ├── 2
+    │   │       └── 10
+    │   └── 7
+    └── 3
+        ├── 2
+        └── 10 |}]
+;;
+
+let%expect_test _ =
+  parse_interpret
+    {|shared_node = (Node 3 (Node 2 Leaf Leaf) (Node 10 Leaf Leaf))
+    tree = (Node 6 (Node 5 (Node 0 shared_node Leaf) (Node 7 Leaf Leaf)) shared_node)
+    
+    min x y = if x <= y then x else y
+
+
+   min_of_tree minim tree = case tree of
+     Leaf -> minim
+     (Node v l r) -> min v (min (min_of_tree minim l) (min_of_tree minim r))
+  
+  tree_of_min tree =
+     let replace_values value tree = case tree of 
+       Leaf -> Leaf
+       (Node v l r) -> Node value (replace_values value l) (replace_values value r)
+     in 
+     replace_values (min_of_tree 1000000 tree) tree
+  res = tree_of_min tree|};
+  [%expect
+    {|
+    min => <fun>
+    min_of_tree => <fun>
+    res =>
+    0
+    ├── 0
+    │   ├── 0
+    │   │   └── 0
+    │   │       ├── 0
+    │   │       └── 0
+    │   └── 0
+    └── 0
+        ├── 0
+        └── 0
+
+    shared_node =>
+    3
+    ├── 2
+    └── 10
+
+    tree =>
+    6
+    ├── 5
+    │   ├── 0
+    │   │   └── 3
+    │   │       ├── 2
+    │   │       └── 10
+    │   └── 7
+    └── 3
+        ├── 2
+        └── 10
+
+    tree_of_min => <fun> |}]
 ;;

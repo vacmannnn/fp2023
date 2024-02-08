@@ -38,6 +38,8 @@ module EnvTypes : sig
     | ValList of res * res
     | ValTuple of res list
     | ValFun of Ast.pat * Ast.expr * environment
+    | ValEmptyTree
+    | ValTree of res * res * res
 end
 
 module Env : sig

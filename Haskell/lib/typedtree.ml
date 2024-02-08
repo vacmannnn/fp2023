@@ -22,6 +22,7 @@ type ty =
   | TyArrow of ty * ty
   | TyList of ty
   | TyTuple of ty list
+  | TyTree of ty
 [@@deriving show { with_path = false }]
 
 type scheme = S of binder_set * ty [@@deriving show { with_path = false }]
@@ -46,6 +47,7 @@ let pp_type fmt ty =
            (fun fmt t -> fprintf fmt "%a" helper t))
         ts;
       fprintf fmt ")"
+    | TyTree t -> fprintf fmt "🌳 of %a" helper t
   in
   helper fmt ty
 ;;

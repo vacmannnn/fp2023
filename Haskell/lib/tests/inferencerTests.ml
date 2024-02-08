@@ -261,3 +261,28 @@ let%expect_test _ =
   [%expect {|
     is_prime :: Int -> Bool |}]
 ;;
+
+let%expect_test _ =
+  parse_infer {|x = (Node 1 (Node 3 Leaf Leaf) Leaf)|};
+  [%expect {|
+    x :: 🌳 of Int |}]
+;;
+
+let%expect_test _ =
+  parse_infer {|x = (Node 1 (Node \x -> x + 1 Leaf Leaf) Leaf)|};
+  [%expect
+    {|
+    This expression has type (Int) but an expression was expected of type (Int -> Int) |}]
+;;
+
+let%expect_test _ =
+  parse_infer {|x = Leaf|};
+  [%expect {|
+    x :: 🌳 of p1 |}]
+;;
+
+let%expect_test _ =
+  parse_infer {|f (Node x  (Node 1  Leaf Leaf) Leaf) = Leaf|};
+  [%expect {|
+    f :: 🌳 of Int -> 🌳 of p9 |}]
+;;

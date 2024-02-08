@@ -66,6 +66,8 @@ module EnvTypes = struct
     | ValList of res * res
     | ValTuple of res list
     | ValFun of pat * expr * environment
+    | ValEmptyTree
+    | ValTree of res * res * res
 end
 
 module Env : sig
@@ -86,7 +88,40 @@ end = struct
   let find env key = Base.Map.find env key
   let update env key data = Base.Map.update env key ~f:(fun _ -> data)
 
-  let rec pp_value fmt = function
+  let rec iter f = function
+    | [] -> ()
+    | [ x ] -> f true x
+    | x :: tl ->
+      f false x;
+      iter f tl
+  ;;
+
+  let rec get_children = function
+    | Result (Ok (ValTree (_, a, b))) ->
+      List.filter (( <> ) (Result (Ok ValEmptyTree))) [ force a; force b ]
+    | _ -> []
+
+  and print_name fmt = function
+    | Result (Ok (ValTree (name, _, _))) -> fprintf fmt "%a\n" pp_value_t name
+    | other -> fprintf fmt "%a\n" pp_value_t other
+
+  (* credit https://gist.github.com/mjambon/75f54d3c9f1a352b38a8eab81880a735 *)
+  and print_tree ?(line_prefix = "") fmt x =
+    print_string "\n";
+    let rec print_root fmt indent x =
+      let x = force x in
+      print_name fmt x;
+      let children = get_children x in
+      iter (print_child fmt indent) children
+    and print_child fmt indent is_last x =
+      let line = if is_last then "└── " else "├── " in
+      fprintf fmt "%s%s" indent line;
+      let extra_indent = if is_last then "    " else "│   " in
+      print_root fmt (indent ^ extra_indent) x
+    in
+    print_root fmt line_prefix x
+
+  and pp_value fmt = function
     | ValInt n -> fprintf fmt "%d" n
     | ValBool b -> fprintf fmt "%b" b
     | ValString s -> fprintf fmt "\"%s\"" s
@@ -104,7 +139,9 @@ end = struct
       fprintf fmt "(";
       pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_value_t fmt es;
       fprintf fmt ")"
-    | ValFun (_param, _body, _env) -> fprintf fmt "<fun>"
+    | ValFun _ -> fprintf fmt "<fun>"
+    | ValEmptyTree -> printf "Leaf"
+    | ValTree _ as tree -> print_tree fmt (return tree)
 
   (* very inefficient, verbose and abhorrent *)
   and transform = function
@@ -140,26 +177,6 @@ end = struct
   open LazyResult
   open LazyResult.Syntax
   open Env
-
-  (* since we don't have 'rec' flag, we have to traverse AST *)
-  let rec is_recursive pat = function
-    | ExprVar v -> v = pat
-    | ExprLit _ -> false
-    | ExprFunc (_, expr) -> is_recursive pat expr
-    | ExprApp (e1, e2) -> is_recursive pat e1 || is_recursive pat e2
-    | ExprIf (cond, e1, e2) ->
-      is_recursive pat cond || is_recursive pat e1 || is_recursive pat e2
-    | ExprTuple exprs -> List.exists (is_recursive pat) exprs
-    | ExprCons (hd, tl) -> is_recursive pat hd || is_recursive pat tl
-    | ExprNil -> false
-    | ExprCase (e, alts) ->
-      is_recursive pat e || List.exists (fun (_, expr) -> is_recursive pat expr) alts
-    | ExprBinOp (_, e1, e2) -> is_recursive pat e1 || is_recursive pat e2
-    | ExprUnOp (_, e) -> is_recursive pat e
-    | ExprLet (bindings, e) ->
-      List.exists (fun (_, binding_expr) -> is_recursive pat binding_expr) bindings
-      || is_recursive pat e
-  ;;
 
   let rec eval env expr =
     match expr with
@@ -236,6 +253,12 @@ end = struct
         in
         let* local_env = List.fold_left helper (return env) bindings in
         eval local_env expr)
+    | ExprTree Leaf -> thunk (fun () -> return ValEmptyTree)
+    | ExprTree (Node (v, n1, n2)) ->
+      let v_t = eval env v in
+      let n1_t = eval env n1 in
+      let n2_t = eval env n2 in
+      thunk (fun () -> return (ValTree (v_t, n1_t, n2_t)))
 
   and eval_case env res = function
     | (pat, expr) :: rest ->
@@ -286,10 +309,6 @@ end = struct
   and match_pattern env pat value =
     match pat with
     | PatVar x ->
-      (* TODO: would be a good idea to allow multiple definitons
-         as a way to pattern match lIkE iN hAsKeLL 😈😈😈.
-
-         Currently it overshadows previous definition.*)
       let* env' = env in
       let env = update env' x value in
       return env
@@ -321,10 +340,18 @@ end = struct
        | LitBool b, ValBool bv when b = bv -> env
        | LitChar c, ValChar cv when c = cv -> env
        | LitString s, ValString sv when s = sv -> env
-       (*
-          | LitFloat f, ValFloat fv when f = fv -> env
-       *)
        | _ -> fail @@ NonExhaustivePatterns "literal")
+    | PatLeaf ->
+      (match force value with
+       | Result (Ok ValEmptyTree) -> env
+       | _ -> fail @@ NonExhaustivePatterns "Leaf")
+    | PatTree (v1, l1, r1) ->
+      (match force value with
+       | Result (Ok (ValTree (v2, l2, r2))) ->
+         let env = match_pattern env v1 v2 in
+         let env = match_pattern env l1 l2 in
+         match_pattern env r1 r2
+       | _ -> fail @@ NonExhaustivePatterns "🌳")
 
   and eval_decl env (DeclLet (pat, e)) =
     let* env' = env in

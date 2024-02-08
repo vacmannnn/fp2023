@@ -105,6 +105,7 @@ module Type = struct
     | TyLit _ -> false
     | TyList ty -> occurs_in v ty
     | TyTuple types -> List.exists (fun ty -> occurs_in v ty) types
+    | TyTree ty -> occurs_in v ty
   ;;
 
   let free_vars =
@@ -114,6 +115,7 @@ module Type = struct
       | TyLit _ -> acc
       | TyList ty -> helper acc ty
       | TyTuple types -> List.fold_left (fun acc ty -> helper acc ty) acc types
+      | TyTree ty -> helper acc ty
     in
     helper VarSet.empty
   ;;
@@ -165,6 +167,7 @@ end = struct
       | TyArrow (l, r) -> TyArrow (helper l, helper r)
       | TyList ty -> TyList (helper ty)
       | TyTuple tys -> TyTuple (List.map tys ~f:helper)
+      | TyTree ty -> TyTree (helper ty)
       | other -> other
     in
     helper
@@ -192,9 +195,9 @@ end = struct
             (List.map ~f:(apply subs) ts2')
             acc'
         | _, _ -> fail @@ UnificationFailed (l, r)
-        (* todo: mismatch *)
       in
       unify_tuples ts1 ts2 empty
+    | TyTree t1, TyTree t2 -> unify t1 t2
     | _ -> fail @@ UnificationFailed (l, r)
 
   and extend k v s =
@@ -314,47 +317,62 @@ let lookup_env id map =
     return (Subst.empty, ans)
 ;;
 
-let infer_pattern =
-  let rec (helper : TypeEnv.t -> pat -> (TypeEnv.t * ty) R.t) =
-    fun env -> function
-    | PatWild ->
-      let* tv = fresh_var in
-      return (env, tv)
-    | PatNil ->
-      let* tv = fresh_var in
-      return (env, TyList tv)
-    | PatLit l ->
-      (match l with
-       | LitInt _ -> return (env, TyLit "Int")
-       | LitBool _ -> return (env, TyLit "Bool")
-       | LitString _ -> return (env, TyLit "String")
-       | LitChar _ -> return (env, TyLit "Char"))
-    | PatVar x ->
-      let* tv = fresh_var in
-      let env = TypeEnv.extend env (x, S (VarSet.empty, tv)) in
-      return (env, tv)
-    | PatTuple ps ->
-      let rec infer_pattern_elements env pats types_acc =
-        match pats with
-        | [] -> return (env, List.rev types_acc)
-        | p :: tl ->
-          let* env', ty = helper env p in
-          infer_pattern_elements env' tl (ty :: types_acc)
-      in
-      let* env', types = infer_pattern_elements env ps [] in
-      return (env', TyTuple types)
-    | PatCons (hd, tl) ->
-      let* env1, typ1 = helper env hd in
-      let* env2, typ2 = helper env1 tl in
-      let* fresh = fresh_var in
-      let* sub_uni = Subst.unify typ2 (TyList fresh) in
-      let typ2 = Subst.apply sub_uni typ2 in
-      let* sub3 = Subst.unify (TyList typ1) typ2 in
-      let* final_sub = Subst.compose_all [ sub3; sub_uni ] in
-      let env = TypeEnv.apply final_sub env2 in
-      return (env, typ2)
-  in
-  helper
+let rec infer_pattern env = function
+  | PatWild ->
+    let* tv = fresh_var in
+    return (env, tv)
+  | PatNil ->
+    let* tv = fresh_var in
+    return (env, TyList tv)
+  | PatLit l ->
+    (match l with
+     | LitInt _ -> return (env, TyLit "Int")
+     | LitBool _ -> return (env, TyLit "Bool")
+     | LitString _ -> return (env, TyLit "String")
+     | LitChar _ -> return (env, TyLit "Char"))
+  | PatVar x ->
+    let* tv = fresh_var in
+    let env = TypeEnv.extend env (x, S (VarSet.empty, tv)) in
+    return (env, tv)
+  | PatTuple ps ->
+    let rec infer_pattern_elements env pats types_acc =
+      match pats with
+      | [] -> return (env, List.rev types_acc)
+      | p :: tl ->
+        let* env', ty = infer_pattern env p in
+        infer_pattern_elements env' tl (ty :: types_acc)
+    in
+    let* env', types = infer_pattern_elements env ps [] in
+    return (env', TyTuple types)
+  | PatCons (hd, tl) ->
+    let* env1, t1 = infer_pattern env hd in
+    let* env2, t2 = infer_pattern env1 tl in
+    let* tv = fresh_var in
+    let* sub_uni = unify t2 (TyList tv) in
+    let t2 = Subst.apply sub_uni t2 in
+    let* s3 = unify (TyList t1) t2 in
+    let* final_sub = Subst.compose_all [ s3; sub_uni ] in
+    let env = TypeEnv.apply final_sub env2 in
+    return (env, t2)
+  | PatLeaf ->
+    let* tv = fresh_var in
+    return (env, TyTree tv)
+  | PatTree (v, n1, n2) ->
+    let* env1, t1 = infer_pattern env v in
+    let* env2, t2 = infer_pattern env1 n1 in
+    let* env3, t3 = infer_pattern env2 n2 in
+    let* tv1 = fresh_var in
+    let* tv2 = fresh_var in
+    let* s1 = unify t2 (TyTree tv1) in
+    let* s2 = unify t3 (TyTree tv2) in
+    let t2 = Subst.apply s1 t2 in
+    let t3 = Subst.apply s2 t3 in
+    let* s3 = unify (TyTree t1) t2 in
+    let* s4 = unify (TyTree t1) t3 in
+    let* final_sub = Subst.compose_all [ s1; s2; s3; s4 ] in
+    let t3 = Subst.apply final_sub t3 in
+    let env = TypeEnv.apply final_sub env3 in
+    return (env, t3)
 ;;
 
 let rec infer_expr env = function
@@ -393,7 +411,7 @@ let rec infer_expr env = function
     let* s1, t1 = infer_expr env e1 in
     let* s2, t2 = infer_expr (TypeEnv.apply s1 env) e2 in
     let* tv = fresh_var in
-    let* s3 = unify t1 (TyArrow (t2, tv)) in
+    let* s3 = unify (Subst.apply s2 t1) (TyArrow (t2, tv)) in
     let trez = Subst.apply s3 tv in
     let* final_subst = Subst.compose_all [ s1; s2; s3 ] in
     return (final_subst, trez)
@@ -410,7 +428,7 @@ let rec infer_expr env = function
     let* s4 = unify t1 (TyLit "Bool") in
     let* s5 = unify t2 t3 in
     let* final_subst = Subst.compose_all [ s1; s2; s3; s4; s5 ] in
-    R.return (final_subst, Subst.apply final_subst t2)
+    return (final_subst, Subst.apply final_subst t2)
   | ExprTuple es ->
     let rec infer_elements env es subst_acc types_acc =
       match es with
@@ -462,6 +480,17 @@ let rec infer_expr env = function
           return (final_subst, Subst.apply final_subst ty, Subst.apply final_subst c_ty))
     in
     return (e_subst, Subst.apply e_subst e_ty)
+  | ExprTree Leaf ->
+    let* tv = fresh_var in
+    return (Subst.empty, TyTree tv)
+  | ExprTree (Node (v, n1, n2)) ->
+    let* s1, t1 = infer_expr env v in
+    let* s2, t2 = infer_expr (TypeEnv.apply s1 env) n1 in
+    let* s3, t3 = infer_expr (TypeEnv.apply s2 env) n2 in
+    let* s4 = unify (TyTree t1) t2 in
+    let* s5 = unify t2 t3 in
+    let* final_subst = Subst.compose_all [ s1; s2; s3; s4; s5 ] in
+    return (final_subst, Subst.apply final_subst t2)
 
 and infer_decl env expr = function
   | PatVar v when is_recursive v expr ->
@@ -498,6 +527,9 @@ and is_recursive pat = function
   | ExprLet (bindings, e) ->
     List.exists (fun (_, binding_expr) -> is_recursive pat binding_expr) bindings
     || is_recursive pat e
+  | ExprTree Leaf -> false
+  | ExprTree (Node (v, n1, n2)) ->
+    is_recursive pat v || is_recursive pat n1 || is_recursive pat n2
 ;;
 
 let rec infer_prog env = function

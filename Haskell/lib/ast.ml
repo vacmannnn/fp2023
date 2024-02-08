@@ -75,10 +75,10 @@ and expr =
   | ExprTree of tree (* Tree value [Node "l" (Node "o" Nil Nil) (Node "h" Nil Nil)] *)
 [@@deriving show { with_path = false }]
 
-(* Type representing a tree structure with arbitrary number of nodes *)
+(* Type representing a binary tree structure with value, left child and right child respectively *)
 and tree =
   | Leaf
-  | Node of expr * tree * tree
+  | Node of expr * expr * expr
 
 (* Type representing a single declaration. *)
 type decl = DeclLet of binding (* Let binding declaration [x = 5] *)

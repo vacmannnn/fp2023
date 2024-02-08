@@ -35,6 +35,7 @@ type ty =
   | TyArrow of ty * ty
   | TyList of ty
   | TyTuple of ty list
+  | TyTree of ty
 
 val pp_ty : Format.formatter -> ty -> unit
 val show_ty : ty -> string
