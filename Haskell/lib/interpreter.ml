@@ -63,7 +63,7 @@ module EnvTypes = struct
     | ValString of string
     | ValChar of char
     | ValNil
-    | ValList of res * res
+    | ValCons of res * res
     | ValTuple of res list
     | ValFun of pat * expr * environment
     | ValEmptyTree
@@ -88,6 +88,23 @@ end = struct
   let find env key = Base.Map.find env key
   let update env key data = Base.Map.update env key ~f:(fun _ -> data)
 
+  let pp_err fmt = function
+    | NotInScopeError str -> fprintf fmt "Not in scope: %S" str
+    | DivisionByZeroError -> fprintf fmt "Infinity"
+    | NonExhaustivePatterns s -> fprintf fmt "Non-exhausitve patterns in %s" s
+    | TypeMismatch ->
+      printf "Type mismatch. Please run type checker to get more information."
+  ;;
+
+  (* very inefficient, verbose and abhorrent *)
+  let rec transform_cons = function
+    | Result (Ok (ValCons (hd, nil))) when force nil = Result (Ok ValNil) ->
+      force hd :: []
+    | Result (Ok (ValCons (hd, tl))) -> force hd :: transform_cons tl
+    | Thunk t -> transform_cons (t ())
+    | _ -> []
+  ;;
+
   let rec iter f = function
     | [] -> ()
     | [ x ] -> f true x
@@ -96,21 +113,20 @@ end = struct
       iter f tl
   ;;
 
-  let rec get_children = function
-    | Result (Ok (ValTree (_, a, b))) ->
-      List.filter (( <> ) (Result (Ok ValEmptyTree))) [ force a; force b ]
-    | _ -> []
-
-  and print_name fmt = function
-    | Result (Ok (ValTree (name, _, _))) -> fprintf fmt "%a\n" pp_value_t name
-    | other -> fprintf fmt "%a\n" pp_value_t other
-
   (* credit https://gist.github.com/mjambon/75f54d3c9f1a352b38a8eab81880a735 *)
-  and print_tree ?(line_prefix = "") fmt x =
-    print_string "\n";
+  let rec pp_tree ?(line_prefix = "") fmt x =
+    let get_children = function
+      | Result (Ok (ValTree (_, a, b))) ->
+        List.filter (( <> ) (Result (Ok ValEmptyTree))) [ force a; force b ]
+      | _ -> []
+    in
+    let pp_node fmt = function
+      | Result (Ok (ValTree (v, _, _))) -> fprintf fmt "%a\n" pp_value_t v
+      | other -> fprintf fmt "%a\n" pp_value_t other
+    in
     let rec print_root fmt indent x =
       let x = force x in
-      print_name fmt x;
+      pp_node fmt x;
       let children = get_children x in
       iter (print_child fmt indent) children
     and print_child fmt indent is_last x =
@@ -127,13 +143,13 @@ end = struct
     | ValString s -> fprintf fmt "\"%s\"" s
     | ValChar c -> fprintf fmt "'%c'" c
     | ValNil -> printf "[]"
-    | ValList (hd, tl) ->
+    | ValCons (hd, tl) ->
       fprintf fmt "[";
       pp_print_list
         ~pp_sep:(fun fmt () -> fprintf fmt ", ")
         pp_value_t
         fmt
-        (force hd :: transform tl);
+        (force hd :: transform_cons tl);
       fprintf fmt "]"
     | ValTuple es ->
       fprintf fmt "(";
@@ -141,29 +157,17 @@ end = struct
       fprintf fmt ")"
     | ValFun _ -> fprintf fmt "<fun>"
     | ValEmptyTree -> printf "Leaf"
-    | ValTree _ as tree -> print_tree fmt (return tree)
-
-  (* very inefficient, verbose and abhorrent *)
-  and transform = function
-    | Result (Ok (ValList (hd, nil))) when force nil = Result (Ok ValNil) ->
-      force hd :: []
-    | Result (Ok (ValList (hd, tl))) -> force hd :: transform tl
-    | Thunk t -> transform (t ())
-    | _ -> []
-
-  and pp_err fmt = function
-    | NotInScopeError str -> fprintf fmt "Not in scope: %S" str
-    | DivisionByZeroError -> fprintf fmt "Infinity"
-    | NonExhaustivePatterns s -> fprintf fmt "Non-exhausitve patterns in %s" s
-    | TypeMismatch ->
-      printf "Type mismatch. Please run type checker to get more information."
+    | ValTree _ as tree ->
+      print_string "\n";
+      pp_tree fmt (return tree)
 
   and pp_value_t fmt = function
     | Result (Ok x) -> pp_value fmt x
     | Result (Error err) -> pp_err fmt err
     | Thunk t -> t () |> pp_value_t fmt
+  ;;
 
-  and pp_environment fmt env =
+  let pp_environment fmt env =
     Base.Map.iteri
       ~f:(fun ~key ~data:value -> fprintf fmt "%s => %a \n" key pp_value_t value)
       env
@@ -190,7 +194,7 @@ end = struct
       thunk (fun () ->
         let* e1' = eval env e1 in
         let* e2' = eval env e2 in
-        force_binop e1' e2' op)
+        eval_binop e1' e2' op)
     | ExprVar x ->
       (match find env x with
        | Some v ->
@@ -218,23 +222,14 @@ end = struct
         let* f_val = eval env f in
         match f_val with
         | ValFun (pat, body, f_env) ->
-          let* local_env =
-            match_pattern
-              (return f_env)
-              pat
-              (* cringe but sometimes it is not in WHNF due to bad design
-                 so we have to make this abominatin *)
-              (thunk (fun () ->
-                 let* arg = eval env arg in
-                 return arg))
-          in
+          let* local_env = match_pattern (return f_env) pat (eval env arg) in
           eval local_env body
         | _ -> fail TypeMismatch)
     | ExprNil -> thunk (fun () -> return ValNil)
     | ExprCons (hd, tl) ->
       let hd_t = eval env hd in
       let tl_t = eval env tl in
-      thunk (fun () -> return (ValList (hd_t, tl_t)))
+      thunk (fun () -> return (ValCons (hd_t, tl_t)))
     | ExprFunc (pat, expr) -> return (ValFun (pat, expr, env))
     | ExprCase (expr, branches) ->
       thunk (fun () ->
@@ -267,7 +262,7 @@ end = struct
        | _ -> eval_case env res rest)
     | [] -> fail TypeMismatch
 
-  and force_binop l r op =
+  and eval_binop l r op =
     match l, r, op with
     | ValInt x, ValInt y, Add -> return (ValInt (x + y))
     | ValInt x, ValInt y, Sub -> return (ValInt (x - y))
@@ -285,12 +280,12 @@ end = struct
         | ValBool _, ValBool _
         | ValString _, ValString _
         | ValChar _, ValChar _ -> return (Base.Poly.compare l r)
-        | ValList (hd1, tl1), ValList (hd2, tl2) ->
+        | ValCons (hd1, tl1), ValCons (hd2, tl2) ->
           let* hd1 = hd1 in
           let* hd2 = hd2 in
           let* res = compare hd1 hd2 in
           (match res, l with
-           | 0, ValList _ ->
+           | 0, ValCons _ ->
              let* tl1 = tl1 in
              let* tl2 = tl2 in
              compare tl1 tl2
@@ -314,7 +309,7 @@ end = struct
       return env
     | PatCons (hd1, tl1) ->
       (match force value with
-       | Result (Ok (ValList (hd2, tl2))) ->
+       | Result (Ok (ValCons (hd2, tl2))) ->
          let env = match_pattern env hd1 hd2 in
          match_pattern env tl1 tl2
        | _ -> fail @@ NonExhaustivePatterns "list")

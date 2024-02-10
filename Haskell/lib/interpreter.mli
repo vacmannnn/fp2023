@@ -35,7 +35,7 @@ module EnvTypes : sig
     | ValString of string
     | ValChar of char
     | ValNil
-    | ValList of res * res
+    | ValCons of res * res
     | ValTuple of res list
     | ValFun of Ast.pat * Ast.expr * environment
     | ValEmptyTree
