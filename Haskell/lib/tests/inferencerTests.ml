@@ -143,7 +143,7 @@ let%expect_test _ =
         res = index (numbers_starting_at 2) 20|};
   [%expect
     {|
-    index :: [p10] -> Int -> p10
+    index :: [p6] -> Int -> p6
     numbers_starting_at :: Int -> [Int]
     res :: Int |}]
 ;;
@@ -219,8 +219,8 @@ let%expect_test _ =
   [%expect
     {|
     hamming :: [Int]
-    map :: (p34 -> p37) -> [p34] -> [p37]
-    map1 :: (p22 -> p25) -> [p22] -> [p25]
+    map :: (p36 -> p39) -> [p36] -> [p39]
+    map1 :: (p24 -> p27) -> [p24] -> [p27]
     merge :: [p7] -> [p7] -> [p7]
     mul :: Int -> Int -> Int |}]
 ;;
@@ -284,5 +284,5 @@ let%expect_test _ =
 let%expect_test _ =
   parse_infer {|f (Node x  (Node 1  Leaf Leaf) Leaf) = Leaf|};
   [%expect {|
-    f :: 🌳 of Int -> 🌳 of p9 |}]
+    f :: 🌳 of Int -> 🌳 of p7 |}]
 ;;

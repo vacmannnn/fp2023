@@ -222,7 +222,9 @@ end = struct
         let* f_val = eval env f in
         match f_val with
         | ValFun (pat, body, f_env) ->
-          let* local_env = match_pattern (return f_env) pat (eval env arg) in
+          let* local_env =
+            match_pattern (return f_env) pat (thunk (fun () -> eval env arg))
+          in
           eval local_env body
         | _ -> fail TypeMismatch)
     | ExprNil -> thunk (fun () -> return ValNil)
