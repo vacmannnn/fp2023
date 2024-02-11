@@ -343,10 +343,9 @@ let rec infer_pattern env = function
     let* env1, t1 = infer_pattern env v in
     let* env2, t2 = infer_pattern env1 n1 in
     let* env3, t3 = infer_pattern env2 n2 in
-    let* tv1 = fresh_var in
-    let* tv2 = fresh_var in
-    let* s1 = unify t2 (TyTree tv1) in
-    let* s2 = unify t3 (TyTree tv2) in
+    let* tv = fresh_var in
+    let* s1 = unify t2 (TyTree tv) in
+    let* s2 = unify t3 (TyTree tv) in
     let t2 = Subst.apply s1 t2 in
     let t3 = Subst.apply s2 t3 in
     let* s3 = unify (TyTree t1) t2 in
@@ -408,8 +407,10 @@ let rec infer_expr env = function
     let* s2, t2 = infer_expr env th in
     let* s3, t3 = infer_expr env el in
     let* s4 = unify t1 (TyLit "Bool") in
-    let* s5 = unify t2 t3 in
-    let* final_subst = Subst.compose_all [ s1; s2; s3; s4; s5 ] in
+    let* tv = fresh_var in
+    let* s5 = unify tv t2 in
+    let* s6 = unify tv t3 in
+    let* final_subst = Subst.compose_all [ s1; s2; s3; s4; s5; s6 ] in
     return (final_subst, Subst.apply final_subst t2)
   | ExprTuple es ->
     let rec infer_elements env es subst_acc types_acc =
@@ -454,6 +455,7 @@ let rec infer_expr env = function
         ~init:(return (e_subst, tv, e_ty))
         ~f:(fun acc (pat, e) ->
           let* subst, ty, c_ty = acc in
+          let env = TypeEnv.apply subst env in
           let* pat_env, pat_ty = infer_pattern env pat in
           let* subst2 = unify c_ty pat_ty in
           let* subst3, e_ty = infer_expr pat_env e in
