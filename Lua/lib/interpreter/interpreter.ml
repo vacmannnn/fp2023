@@ -1,20 +1,15 @@
 (** Copyright 2023-2024, Alexandr Lekomtsev *)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
-
 open Ast
 
-module Hashtbl_p = struct
-  type ('k, 's) t = ('k, 's) Hashtbl.t
+module MapString = struct
+  include Map.Make (String)
 
-  let pp pp_key pp_value ppf values =
-    Format.fprintf ppf "[["
-    |> fun () ->
-    Hashtbl.iter
-      (fun key data ->
-        Format.fprintf ppf "@[<1>%a@ ->@ %a@]@\n@." pp_key key pp_value data)
-      values
-    |> fun () -> Format.fprintf ppf "]]@\n"
+  let pp pp_v ppf m =
+    Format.fprintf ppf "@[[@[";
+    iter (fun k v -> Format.fprintf ppf "@[%S: %a@],@\n" k pp_v v) m;
+    Format.fprintf ppf "@]]@]"
   ;;
 end
 
@@ -94,8 +89,6 @@ module Eval (M : MONADERROR) = struct
     | _ -> false
   ;;
 
-  type variables = (ident, expression) Hashtbl_p.t [@@deriving show { with_path = false }]
-
   type jump_statement =
     | Default
     | Return
@@ -103,7 +96,7 @@ module Eval (M : MONADERROR) = struct
   [@@deriving show { with_path = false }]
 
   type environment =
-    { vars : variables
+    { vars : expression MapString.t
     ; last_value : expression
     ; is_loop : bool
     ; jump_stmt : jump_statement
@@ -114,19 +107,19 @@ module Eval (M : MONADERROR) = struct
 
   let create_next_env = function
     | [] ->
-      [ { vars = Hashtbl.create 42
+      [ { vars = MapString.empty
         ; last_value = Exp_nil
         ; is_loop = false
         ; jump_stmt = Default
         }
       ]
-    | hd_env :: tl -> { hd_env with vars = Hashtbl.create 42 } :: hd_env :: tl
+    | hd_env :: tl -> { hd_env with vars = MapString.empty } :: hd_env :: tl
   ;;
 
   let rec find_var varname = function
     | [] -> return Exp_nil
     | hd_env :: tl ->
-      (match Hashtbl.find_opt hd_env.vars varname with
+      (match MapString.find_opt varname hd_env.vars with
        | Some v -> return v
        | None -> find_var varname tl)
 
@@ -134,11 +127,9 @@ module Eval (M : MONADERROR) = struct
     | [] -> error "Error: Can't set last_value. Head is absent!"
     | hd :: tl -> return ({ hd with last_value } :: tl)
 
-  and modify_hd_vars value = function
+  and modify_hd_vars n v = function
     | [] -> error "Error: Can't modify environment head variables. Head is absent!"
-    | hd :: _ ->
-      let update_var (name, vle) = return (Hashtbl.replace hd.vars name vle) in
-      update_var value
+    | hd :: tl -> return ({ hd with vars = MapString.add n v hd.vars } :: tl)
 
   and get_cur_env = function
     | [] -> error "Error: Current environment is absent!"
@@ -236,18 +227,14 @@ module Eval (M : MONADERROR) = struct
 
   and assign n v loc env_lst =
     let rec set_global n v = function
-      | [] -> ()
-      | [ hd ] -> Hashtbl.replace hd.vars n v
+      | [] -> []
+      | [ hd ] -> [ { hd with vars = MapString.add n v hd.vars } ]
       | hd :: tl ->
-        (match Hashtbl.find_opt hd.vars n with
-         | None -> set_global n v tl
-         | Some _ -> Hashtbl.replace hd.vars n v)
+        (match MapString.find_opt n hd.vars with
+         | None -> hd :: set_global n v tl
+         | Some _ -> { hd with vars = MapString.add n v hd.vars } :: tl)
     in
-    if is_global loc
-    then (
-      set_global n v env_lst;
-      return env_lst)
-    else modify_hd_vars (n, v) env_lst >>= fun _ -> return env_lst
+    if is_global loc then return (set_global n v env_lst) else modify_hd_vars n v env_lst
 
   and eval_while e bdy env_lst =
     eval_expr env_lst e
@@ -323,7 +310,7 @@ let eval parsed_prog =
 let%expect_test "fact_interpreter" =
   eval
     (Parser.parse_exn
-       {| k = 10 
+       {| k = 10
        i = 1 
        n = 1 
        while i <= k do 
@@ -332,15 +319,12 @@ let%expect_test "fact_interpreter" =
       end |});
   [%expect
     {|
-    { vars = [["k" -> (Exp_number 10.)
-
-    "n" -> (Exp_number 3628800.)
-
-    "i" -> (Exp_number 11.)
-
-    ]]
-    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-    } |}]
+    { vars =
+      ["i": (Exp_number 11.),
+       "k": (Exp_number 10.),
+       "n": (Exp_number 3628800.),
+       ];
+      last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "func_decl" =
@@ -352,51 +336,44 @@ end |});
   [%expect
     {|
     { vars =
-      [["fact" ->
-         (Exp_function (["n"],
-            [(Stat_if (
-                [((Exp_op (Op_eq, (Exp_lhs "n"), (Exp_number 0.))),
-                  [(Stat_return [(Exp_number 1.)])])],
-                (Some [(Stat_return
-                          [(Exp_op (Op_mul, (Exp_lhs "n"),
-                              (Exp_call
-                                 (Call ((Exp_lhs "fact"),
-                                    [(Exp_op (Op_sub, (Exp_lhs "n"),
-                                        (Exp_number 1.)))
-                                      ]
-                                    )))
-                              ))
-                            ])
-                        ])
-                ))
-              ]
-            ))
-
-    ]]
-    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-    } |}]
+      ["fact": (Exp_function (["n"],
+                  [(Stat_if (
+                      [((Exp_op (Op_eq, (Exp_lhs "n"), (Exp_number 0.))),
+                        [(Stat_return [(Exp_number 1.)])])],
+                      (Some [(Stat_return
+                                [(Exp_op (Op_mul, (Exp_lhs "n"),
+                                    (Exp_call
+                                       (Call ((Exp_lhs "fact"),
+                                          [(Exp_op (Op_sub, (Exp_lhs "n"),
+                                              (Exp_number 1.)))
+                                            ]
+                                          )))
+                                    ))
+                                  ])
+                              ])
+                      ))
+                    ]
+                  )),
+       ];
+      last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "while" =
   eval (Parser.parse_exn "x = 15 while x > 10 do x = x - 4 end");
   [%expect
     {|
-    { vars = [["x" -> (Exp_number 7.)
-
-    ]]
-    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-    } |}]
+    { vars = ["x": (Exp_number 7.),
+              ];
+      last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "if" =
   eval (Parser.parse_exn "x = 100 if x == 100 then x = 10 end");
   [%expect
     {|
-    { vars = [["x" -> (Exp_number 10.)
-
-    ]]
-    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-    } |}]
+    { vars = ["x": (Exp_number 10.),
+              ];
+      last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "help" =
@@ -408,33 +385,27 @@ let%expect_test "help" =
     ];
   [%expect
     {|
-      { vars = [["x" -> (Exp_number 7.)
-
-      ]]
-      ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-      } |}]
+      { vars = ["x": (Exp_number 7.),
+                ];
+        last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "assign" =
   eval (Parser.parse_exn "x = 42");
   [%expect
     {|
-    { vars = [["x" -> (Exp_number 42.)
-
-    ]]
-    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-    } |}]
+    { vars = ["x": (Exp_number 42.),
+              ];
+      last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "bool_assign" =
   eval (Parser.parse_exn {| x = "abc" ~= "cba" |});
   [%expect
     {|
-    { vars = [["x" -> Exp_true
-
-    ]]
-    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-    } |}]
+    { vars = ["x": Exp_true,
+              ];
+      last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "incorrect_assign" =
@@ -446,17 +417,14 @@ let%expect_test "string_assign" =
   eval [ Stat_assign (Nonlocal, "x", Exp_string "whennnnnn") ];
   [%expect
     {|
-    { vars = [["x" -> (Exp_string "whennnnnn")
-
-    ]]
-    ; last_value = Exp_nil; is_loop = false; jump_stmt = Default
-    } |}]
+    { vars = ["x": (Exp_string "whennnnnn"),
+              ];
+      last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
 
 let%expect_test "while2" =
   eval (Parser.parse_exn "while false do x = 1 end");
   [%expect
     {|
-    { vars = [[]]
-      ; last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
+    { vars = []; last_value = Exp_nil; is_loop = false; jump_stmt = Default } |}]
 ;;
