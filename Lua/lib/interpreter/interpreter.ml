@@ -1,6 +1,7 @@
 (** Copyright 2023-2024, Alexandr Lekomtsev *)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
+
 open Ast
 
 module MapString = struct
@@ -39,7 +40,8 @@ end
 module Eval (M : MONADERROR) = struct
   open M
 
-  let arg_to_num arg1 arg2 msg =
+  (** trying convert args to numbers (float) or send err_msg *)
+  let arg_to_num arg1 arg2 err_msg =
     let is_num x =
       match float_of_string_opt x with
       | None -> false
@@ -51,7 +53,7 @@ module Eval (M : MONADERROR) = struct
       return (arg1, float_of_string arg2)
     | Exp_string arg1, Exp_number arg2 when is_num arg1 ->
       return (float_of_string arg1, arg2)
-    | _ -> error msg
+    | _ -> error err_msg
   ;;
 
   let compare lhs rhs op =

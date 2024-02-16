@@ -8,7 +8,9 @@ open Ast
 open Common
 open Expr
 
-let parse_function1 pblock =
+(** ======= Function declaration, assign, if, while parsers ======= *)
+
+let parse_stat_function pblock =
   let parse_idents =
     string "(" *> sep_by (ws *> string "," *> ws) parse_ident <* string ")"
   in
@@ -28,7 +30,7 @@ let parse_assign pblock =
      parse_flag
      (ws *> parse_ident)
      (ws *> char '=' *> ws *> parse_expr pblock))
-  <|> parse_function1 pblock
+  <|> parse_stat_function pblock
 ;;
 
 let parse_if pblock =
@@ -60,7 +62,8 @@ let parse_while pblock =
   lift2 (fun exp block -> Stat_while (exp, block)) parse_while1 parse_pblock
 ;;
 
-let parse_stcall pexpr = parse_apply pexpr >>| fun e1 -> Stat_call e1
+(** Parse single function call, example: print(10) *)
+let parse_st_call pexpr = parse_apply pexpr >>| fun e1 -> Stat_call e1
 
 let parse_do pblock =
   string "do" *> pblock <* ws <* string "end" >>| fun block -> Stat_do block
@@ -81,7 +84,7 @@ let parse_stat pblock =
        ; parse_do pblock
        ; parse_while pblock
        ; parse_return pblock
-       ; parse_stcall (parse_expr pblock)
+       ; parse_st_call (parse_expr pblock)
        ; parse_break
        ]
 ;;

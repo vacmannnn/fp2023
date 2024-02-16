@@ -22,7 +22,7 @@ let chainl1 e op =
   e >>= fun init -> go init
 ;;
 
-(* ======= Ident ======= *)
+(** ======= Ident parser ======= *)
 
 let is_keyword = function
   | "and"

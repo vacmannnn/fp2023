@@ -7,6 +7,8 @@ open Angstrom
 open Ast
 open Common
 
+(** Parse constants *)
+
 let parse_true = string "true" *> return Exp_true
 let parse_false = string "false" *> return Exp_false
 let parse_nil = string "nil" *> return Exp_nil
@@ -24,6 +26,8 @@ let parse_number =
   try return (Exp_number (Float.of_string s)) with
   | Invalid_argument _ -> fail "not a number"
 ;;
+
+(** Parse identsm function declaration, function call *)
 
 let parse_explhs = parse_ident >>| fun lhs -> Exp_lhs lhs
 
@@ -44,6 +48,7 @@ let parse_apply pexpr =
     (sep_by (string ",") (ws *> pexpr) <* string ")")
 ;;
 
+(** Parse function call in expression, example: n * fact(n-1) *)
 let parse_expcall pexpr = parse_apply pexpr >>| fun e1 -> Exp_call e1
 
 let parse_single_expr pblock pexpr =
@@ -59,6 +64,8 @@ let parse_single_expr pblock pexpr =
        ; parse_explhs
        ]
 ;;
+
+(** Parse arithmetic *)
 
 let pmul = string "*" *> return (fun x y -> Exp_op (Op_mul, x, y))
 let pdiv = string "/" *> return (fun x y -> Exp_op (Op_div, x, y))
